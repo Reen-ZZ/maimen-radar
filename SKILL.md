@@ -57,6 +57,8 @@ description: 麦门雷达 —— 麦当劳权益的「可用窗口」雷达。�
 
 **券的真实增益**是本 skill 的招牌诚实：`原价 − 券价` 是营销数字，`菜单现价 − 券价` 才是用户真省到的。两者都报，差得多就直说"别为它专门跑一趟"。
 
+**`available-coupons` 报 -32602（"data/data must be array"）＝无券可领**，不是故障——此时服务端返回 `data:null`，过不了严格客户端的 schema 校验（详见 references/fields.md）。直接告诉用户"现在没有可领的券"，不重试、不报"服务异常"，可建议去麦当劳 App 碰碰运气。
+
 ## 输出形状
 
 **使用面**：`src/render-text.mjs` 的单一事实版式。纯 Unicode，聊天/终端/README 四处通用，32 格时段条。

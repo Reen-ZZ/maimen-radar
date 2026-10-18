@@ -75,6 +75,8 @@
 ## 错误码 ≠ 错误
 
 - **`available-coupons` 用 `success:false, code:499, message:"No coupons available"` 表达"没有可领的券"** —— 稳定语义，不是瞬时故障，也不是限流。按标准错误处理会给用户弹"服务异常"。判"无券可领"要认这个 499，重试三次结果一致（traceId `5afa6d56…`、`6ec1351a…`）。
+- **严格校验 structured content 的客户端（实测 WorkBuddy）上，`available-coupons` 无券时会直接抛 `MCP error -32602: Structured content does not match the tool's output schema: data/data must be array`**。原因：此时服务端返回 `data: null`（见 `fixtures/available-coupons.json`），过不了工具声明的 `data: array` output schema，客户端在模型看到结果之前就拦截了。**它与 code:499 是同一个「无券可领」语义的两种长相**——原文解析（probe）绕过校验拿到 499，严格客户端抛 -32602，同账号同日互证（2026-10-18）。按"无券可领"处理：直接告诉用户现在没有可领的券，**不重试、不报"服务异常"**。
+- 成功场景 `data` 是否为数组未验证（需要一个有可领券的账号确认）。若届时也报 -32602，同样降级为人话提示并引导去麦当劳 App 领取，别当故障。
 - 401 才是 Token 问题；429 才是限流（600 次/分钟）。
 
 ## 服务端

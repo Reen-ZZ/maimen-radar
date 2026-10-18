@@ -96,6 +96,7 @@ $ node src/check.mjs
 | `beTypes` 需与当前取餐场景匹配，`3`/`4` 含义官方未公开 | 判定必须校验；文案只说"不支持当前取餐方式"，不猜含义 |
 | `query-store-coupons` 返回**已按门店+业务类型过滤**，且带 `products[].productCode` | ① "能用哪张"不是产品空白，差异化要往"为什么被滤掉"上移；② 券与菜单可硬 join，价格阶梯不用猜 |
 | `available-coupons` 用 `code:499 / "No coupons available"` 表达"无券可领" | 重试三次结果一致，是稳定语义。按标准错误处理会给用户弹"服务异常" |
+| 严格校验客户端（WorkBuddy 实测）上无券时改抛 `-32602: data/data must be array` | 无券时 `data:null` 过不了 output schema，与 499 同义。skill 按"无券可领"处理，不重试 |
 | `mall-points-products` 的 `price` 字段恒为 `0`，真实元值在 `selling` 文案开头 | 金额必须正则解析，不能读 `price` |
 | `query-meals` 是归一化结构：`data.meals` 为 `code→实体` 字典，`categories[].meals[]` 只是带 `tags` 的引用 | 直接遍历分类取不到价格 |
 | **麦金卡是另一条 SKU code**，靠引用上的 `tags:["麦金卡"]` 识别 | 同一商品两条 code，需按 `name` 归并才能拼出价格阶梯 |
