@@ -1,0 +1,501 @@
+{
+  "success": true,
+  "code": 200,
+  "message": "请求成功",
+  "datetime": "2026-10-18 16:16:13",
+  "traceId": "9f5d2b59e766152a83be14cc2d280c7b",
+  "data": {
+    "coupons": [
+      {
+        "id": "ee3e7af7fbed34fa2a95d99948781ec6",
+        "code": "FIXTURE-COUPON-EE3E7AF7",
+        "title": "9.9元中杯冰美式",
+        "subtitle": "",
+        "showType": 100,
+        "image": "https://example.invalid/fixture/coupon.png",
+        "bigImage": "https://example.invalid/fixture/coupon-big.png",
+        "instructions": {
+          "labels": [],
+          "availableTime": [
+            {
+              "text": "2026.10.12-2026.10.18",
+              "color": "#222222",
+              "type": 1
+            }
+          ]
+        },
+        "discountInfo": {
+          "discountValue": "9.9",
+          "discountDesc": "用券价格",
+          "discountTypePosition": 1,
+          "discountTypeText": "¥"
+        },
+        "tradeStartDate": "2026-10-12",
+        "tradeEndDate": "2026-10-18",
+        "tradeStartDateTime": "2026-10-12 00:00:00",
+        "tradeEndDateTime": "2026-10-18 23:59:59",
+        "weekdays": [],
+        "isAllTradeTime": 1,
+        "tradeTimePeriods": [],
+        "totalCount": 1,
+        "totalAvailableCount": 1,
+        "currentDayAvailableCount": 1,
+        "orderType": 1,
+        "orderTypes": [
+          1,
+          2
+        ],
+        "tags": [
+          {
+            "type": 3,
+            "value": "due today",
+            "label": "今日到期",
+            "color": "#FFBC0D"
+          },
+          {
+            "type": 2,
+            "value": "pickup",
+            "label": "到店专用",
+            "color": "#FFBC0D"
+          },
+          {
+            "type": 2,
+            "value": "delivery",
+            "label": "外送专用",
+            "color": "#FFBC0D"
+          }
+        ],
+        "enable": 1,
+        "filterValues": [],
+        "beType": 1,
+        "beTypes": [
+          1,
+          2,
+          3,
+          5
+        ],
+        "promotionId": "112023002",
+        "couponCardType": 0,
+        "mpCouponType": 0,
+        "isPrepaid": 0,
+        "couponPromotionType": 1,
+        "promotionChildrenType": 11,
+        "channels": [
+          "03",
+          "14",
+          "45",
+          "54"
+        ],
+        "isCanGive": 1,
+        "reducePrice": "",
+        "reducePriceText": "",
+        "paymentType": 0,
+        "paymentTypeForSort": 0,
+        "appliedCategory": 1,
+        "ifFreeCoupon": false,
+        "receiveTime": "2026-10-12 10:00:18",
+        "isGiveAway": 0,
+        "shareThemeId": 8,
+        "supportReservation": 0,
+        "supportSoldOut": 0,
+        "jumpUseScenes": [
+          "01"
+        ],
+        "fulfillment": 0,
+        "currentChannelCanRedeem": false,
+        "onlyAppCanRedeem": false,
+        "onlyPosCanRedeem": false,
+        "channelIconUrls": [],
+        "receivedDays": 6,
+        "receivedDaysMsg": "6日前收到",
+        "btnText": "查看券详情",
+        "datetimeText": "2026-10-12 00:00-2026-10-18 23:59",
+        "bindButtonGif": "https://example.invalid/fixture/bind.gif",
+        "toastText": "该券仅限麦当劳App使用",
+        "multipleProducts": false
+      },
+      {
+        "id": "43c115760db4733876eb33b10e55cbac",
+        "code": "FIXTURE-COUPON-43C11576",
+        "title": "人气麦旋风买一送一",
+        "subtitle": "",
+        "showType": 100,
+        "image": "https://example.invalid/fixture/coupon.png",
+        "bigImage": "https://example.invalid/fixture/coupon-big.png",
+        "instructions": {
+          "labels": [
+            {
+              "text": "到店",
+              "color": "#222222",
+              "code": 0
+            }
+          ],
+          "availableTime": [
+            {
+              "text": "今日",
+              "color": "#DB0007",
+              "type": 2
+            },
+            {
+              "text": "22:00",
+              "color": "#DB0007",
+              "type": 1
+            },
+            {
+              "text": "到期",
+              "color": "#DB0007",
+              "type": 2
+            }
+          ]
+        },
+        "discountInfo": {
+          "discountValue": "15",
+          "discountDesc": "用券价格",
+          "discountTypePosition": 1,
+          "discountTypeText": "¥"
+        },
+        "tradeStartDate": "2026-10-12",
+        "tradeEndDate": "2026-10-18",
+        "tradeStartDateTime": "2026-10-12 00:00:00",
+        "tradeEndDateTime": "2026-10-18 23:59:59",
+        "weekdays": [],
+        "isAllTradeTime": 0,
+        "tradeTimePeriods": [
+          {
+            "startTime": "10:00:00",
+            "endTime": "22:00:00"
+          }
+        ],
+        "totalCount": 1,
+        "totalAvailableCount": 1,
+        "currentDayAvailableCount": 1,
+        "orderType": 1,
+        "orderTypes": [
+          1
+        ],
+        "tags": [
+          {
+            "type": 3,
+            "value": "due today",
+            "label": "今日到期",
+            "color": "#FFBC0D"
+          },
+          {
+            "type": 2,
+            "value": "pickup",
+            "label": "到店专用",
+            "color": "#FFBC0D"
+          }
+        ],
+        "enable": 1,
+        "filterValues": [],
+        "beType": 4,
+        "beTypes": [
+          4
+        ],
+        "promotionId": "112473001",
+        "couponCardType": 0,
+        "mpCouponType": 0,
+        "isPrepaid": 0,
+        "couponPromotionType": 1,
+        "promotionChildrenType": 11,
+        "channels": [
+          "45",
+          "03",
+          "54"
+        ],
+        "isCanGive": 1,
+        "reducePrice": "",
+        "reducePriceText": "",
+        "paymentType": 0,
+        "paymentTypeForSort": 0,
+        "appliedCategory": 0,
+        "ifFreeCoupon": false,
+        "receiveTime": "2026-10-12 10:00:18",
+        "isGiveAway": 0,
+        "shareThemeId": 8,
+        "supportReservation": 0,
+        "supportSoldOut": 0,
+        "jumpUseScenes": [
+          "01"
+        ],
+        "fulfillment": 0,
+        "currentChannelCanRedeem": false,
+        "onlyAppCanRedeem": false,
+        "onlyPosCanRedeem": false,
+        "channelIconUrls": [],
+        "receivedDays": 6,
+        "receivedDaysMsg": "6日前收到",
+        "btnText": "查看券详情",
+        "datetimeText": "2026-10-12 00:00-2026-10-18 23:59 10:00-22:00",
+        "bindButtonGif": "https://example.invalid/fixture/bind.gif",
+        "toastText": "该券仅限麦当劳App使用",
+        "multipleProducts": false
+      },
+      {
+        "id": "b364e85f082090b288042f0d6a453da2",
+        "code": "FIXTURE-COUPON-B364E85F",
+        "title": "11.9元麦辣鸡腿堡",
+        "subtitle": "",
+        "showType": 100,
+        "image": "https://example.invalid/fixture/coupon.png",
+        "bigImage": "https://example.invalid/fixture/coupon-big.png",
+        "instructions": {
+          "labels": [
+            {
+              "text": "未到使用时间",
+              "color": "#666666",
+              "code": 2
+            }
+          ],
+          "availableTime": [
+            {
+              "text": "2026.10.19-2026.10.23",
+              "color": "#666666",
+              "type": 1
+            },
+            {
+              "text": "周一、二、三、四、五",
+              "color": "#666666",
+              "type": 2
+            },
+            {
+              "text": "10:30-23:59",
+              "color": "#666666",
+              "type": 1
+            }
+          ]
+        },
+        "discountInfo": {
+          "discountValue": "11.9",
+          "discountDesc": "用券价格",
+          "discountTypePosition": 1,
+          "discountTypeText": "¥"
+        },
+        "tradeStartDate": "2026-10-19",
+        "tradeEndDate": "2026-10-23",
+        "tradeStartDateTime": "2026-10-19 10:30:00",
+        "tradeEndDateTime": "2026-10-23 23:59:59",
+        "weekdays": [
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "isAllTradeTime": 0,
+        "tradeTimePeriods": [
+          {
+            "startTime": "10:30:00",
+            "endTime": "23:59:59"
+          }
+        ],
+        "totalCount": 1,
+        "totalAvailableCount": 1,
+        "currentDayAvailableCount": 0,
+        "orderType": 1,
+        "orderTypes": [
+          1,
+          2
+        ],
+        "tags": [
+          {
+            "type": 2,
+            "value": "pickup",
+            "label": "到店专用",
+            "color": "#FFBC0D"
+          },
+          {
+            "type": 2,
+            "value": "delivery",
+            "label": "外送专用",
+            "color": "#FFBC0D"
+          }
+        ],
+        "enable": 0,
+        "filterValues": [],
+        "beType": 1,
+        "beTypes": [
+          1,
+          2,
+          5
+        ],
+        "promotionId": "112479003",
+        "couponCardType": 0,
+        "mpCouponType": 0,
+        "isPrepaid": 0,
+        "couponPromotionType": 1,
+        "promotionChildrenType": 11,
+        "channels": [
+          "03",
+          "14",
+          "201",
+          "202"
+        ],
+        "isCanGive": 0,
+        "reducePrice": "",
+        "reducePriceText": "",
+        "paymentType": 0,
+        "paymentTypeForSort": 0,
+        "appliedCategory": 1,
+        "ifFreeCoupon": false,
+        "receiveTime": "2026-10-17 01:59:12",
+        "isGiveAway": 0,
+        "shareThemeId": 8,
+        "supportReservation": 0,
+        "supportSoldOut": 0,
+        "unavailableType": 1,
+        "jumpUseScenes": [
+          "01"
+        ],
+        "fulfillment": 0,
+        "currentChannelCanRedeem": false,
+        "onlyAppCanRedeem": false,
+        "onlyPosCanRedeem": false,
+        "channelIconUrls": [],
+        "receivedDays": 1,
+        "receivedDaysMsg": "昨日收到",
+        "btnText": "查看券详情",
+        "datetimeText": "2026-10-19 10:30-2026-10-23 23:59 周一、二、三、四、五 10:30-23:59",
+        "bindButtonGif": "https://example.invalid/fixture/bind.gif",
+        "toastText": "该券仅限麦当劳App使用",
+        "disableBtnText": "当前渠道不可用",
+        "multipleProducts": false
+      },
+      {
+        "id": "761d3286699774997ab6e5cba24eb74d",
+        "code": "FIXTURE-COUPON-761D3286",
+        "title": "19.9元王牌炸鸡任选2",
+        "subtitle": "",
+        "showType": 100,
+        "image": "https://example.invalid/fixture/coupon.png",
+        "bigImage": "https://example.invalid/fixture/coupon-big.png",
+        "instructions": {
+          "labels": [
+            {
+              "text": "未到使用时间",
+              "color": "#666666",
+              "code": 2
+            }
+          ],
+          "availableTime": [
+            {
+              "text": "2026.10.19-2026.10.23",
+              "color": "#666666",
+              "type": 1
+            },
+            {
+              "text": "周一、二、三、四、五",
+              "color": "#666666",
+              "type": 2
+            },
+            {
+              "text": "10:30-23:59",
+              "color": "#666666",
+              "type": 1
+            }
+          ]
+        },
+        "discountInfo": {
+          "discountValue": "19.9",
+          "discountDesc": "用券价格",
+          "discountTypePosition": 1,
+          "discountTypeText": "¥"
+        },
+        "tradeStartDate": "2026-10-19",
+        "tradeEndDate": "2026-10-23",
+        "tradeStartDateTime": "2026-10-19 10:30:00",
+        "tradeEndDateTime": "2026-10-23 23:59:59",
+        "weekdays": [
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "isAllTradeTime": 0,
+        "tradeTimePeriods": [
+          {
+            "startTime": "10:30:00",
+            "endTime": "23:59:59"
+          }
+        ],
+        "totalCount": 1,
+        "totalAvailableCount": 1,
+        "currentDayAvailableCount": 0,
+        "orderType": 1,
+        "orderTypes": [
+          1,
+          2
+        ],
+        "tags": [
+          {
+            "type": 2,
+            "value": "pickup",
+            "label": "到店专用",
+            "color": "#FFBC0D"
+          },
+          {
+            "type": 2,
+            "value": "delivery",
+            "label": "外送专用",
+            "color": "#FFBC0D"
+          }
+        ],
+        "enable": 0,
+        "filterValues": [],
+        "beType": 1,
+        "beTypes": [
+          1,
+          2,
+          5
+        ],
+        "promotionId": "112479004",
+        "couponCardType": 0,
+        "mpCouponType": 0,
+        "isPrepaid": 0,
+        "couponPromotionType": 1,
+        "promotionChildrenType": 11,
+        "channels": [
+          "03",
+          "14",
+          "201",
+          "202"
+        ],
+        "isCanGive": 0,
+        "reducePrice": "",
+        "reducePriceText": "",
+        "paymentType": 0,
+        "paymentTypeForSort": 0,
+        "appliedCategory": 0,
+        "ifFreeCoupon": false,
+        "receiveTime": "2026-10-17 01:59:12",
+        "isGiveAway": 0,
+        "shareThemeId": 8,
+        "supportReservation": 0,
+        "supportSoldOut": 0,
+        "unavailableType": 1,
+        "jumpUseScenes": [
+          "01"
+        ],
+        "fulfillment": 0,
+        "currentChannelCanRedeem": false,
+        "onlyAppCanRedeem": false,
+        "onlyPosCanRedeem": false,
+        "channelIconUrls": [],
+        "receivedDays": 1,
+        "receivedDaysMsg": "昨日收到",
+        "btnText": "查看券详情",
+        "datetimeText": "2026-10-19 10:30-2026-10-23 23:59 周一、二、三、四、五 10:30-23:59",
+        "bindButtonGif": "https://example.invalid/fixture/bind.gif",
+        "toastText": "该券仅限麦当劳App使用",
+        "disableBtnText": "当前渠道不可用",
+        "multipleProducts": false
+      }
+    ],
+    "totalCount": 4,
+    "currentPage": 1,
+    "pageSize": 200,
+    "totalPages": 1
+  }
+}

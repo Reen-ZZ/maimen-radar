@@ -1,0 +1,16 @@
+# 本地环境与运行时产物
+.env
+.env.*
+!.env.example
+node_modules/
+
+# 真实 MCP 响应，含可核销券码与 accountId —— 永不提交
+out/
+
+# 渲染产物
+dist/
+
+# 本地设计与实测记录，不对外发布
+docs/
+.tmp/
+src/journey.mjs

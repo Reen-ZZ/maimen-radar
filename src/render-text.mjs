@@ -1,0 +1,115 @@
+/**
+ * 文本渲染器 —— 单一事实版式
+ * 纯 Unicode，聊天 / 终端 / README 代码块 / HTML <pre> 四处通用。
+ * 脱敏由 model 决定（m.share），本文件不做任何数据加工。
+ */
+
+const W = 32;
+
+/** CJK 全角按 2 列计 */
+function dw(s) {
+  let n = 0;
+  for (const ch of String(s)) {
+    const c = ch.codePointAt(0);
+    n += c > 0x2e80 && c < 0xd400 ? 2 : c >= 0xff00 ? 2 : 1;
+  }
+  return n;
+}
+function pad(s, w) {
+  s = String(s);
+  const d = w - dw(s);
+  return d > 0 ? s + ' '.repeat(d) : s;
+}
+function ell(s, w) {
+  s = String(s);
+  if (dw(s) <= w) return s;
+  let out = '';
+  for (const ch of s) {
+    if (dw(out + ch) > w - 1) break;
+    out += ch;
+  }
+  return out + '…';
+}
+
+function bar(coupon, nowMin) {
+  const cells = new Array(W).fill('░');
+  for (const win of coupon.wins) {
+    const a = Math.max(0, Math.floor((win.from / 1440) * W));
+    const b = Math.min(W, Math.ceil((win.to / 1440) * W));
+    for (let i = a; i < b; i++) {
+      const cellMin = (i / W) * 1440;
+      cells[i] = coupon.state === 'locked' ? '░' : cellMin <= nowMin ? '█' : '▓';
+    }
+  }
+  if (coupon.state === 'gift') for (let i = 0; i < W; i++) cells[i] = '╌';
+  return cells.join('');
+}
+
+function axis() {
+  const line = new Array(W).fill(' ');
+  for (const h of [0, 12, 24]) {
+    const i = Math.min(W - 2, Math.round((h / 24) * (W - 2)));
+    line.splice(i, 2, ...String(h).padStart(2, '0').split(''));
+  }
+  return line.join('');
+}
+
+function nowMark(nowMin) {
+  const line = new Array(W).fill(' ');
+  line[Math.min(W - 1, Math.round((nowMin / 1440) * (W - 1)))] = '▾';
+  return line.join('');
+}
+
+export function renderText(m) {
+  const share = !!m.share;
+  const nowMin = m.nowMin;
+  const p = m.points;
+  const L = [];
+
+  L.push(`📡 麦门雷达 · ${m.reportName}${share ? '（分享版）' : ''}`);
+  L.push(`   ${m.nowText} ${m.weekdayLabel} · ${ell(m.store.name, 26)} · 券 ${m.coupons.length} 张`);
+  L.push('');
+
+  L.push('   可用窗口            ' + axis());
+  L.push(`                      ${nowMark(nowMin)}`);
+  L.push('   ' + '─'.repeat(3 + 22 + W + 2));
+  for (const c of m.coupons) {
+    L.push(`   ${c.glyph} ${pad(ell(c.displayTitle, 20), 21)}${bar(c, nowMin)} ${share ? c.absoluteDue : c.countdown}`);
+    const note = c.reasons[0] || c.scopeTags.join('/');
+    if (note) L.push(`      ↳ ${note}${c.couponPrice ? ` · 用券 ¥${c.couponPrice}` : ''}${c.quota ? ` · 今日余 ${c.quota} 次` : ''}`);
+  }
+  L.push('');
+
+  L.push(`💸 ${p.headline}`);
+  L.push(p.showAbsolute
+    ? `   已花掉 ${p.used}（${p.usedPct.toFixed(1)}%）· 已作废 ${p.expired}（${p.expiredPct.toFixed(1)}%）· 在手 ${p.available}`
+    : `   已花掉 ${p.usedPct.toFixed(1)}% · 已作废 ${p.expiredPct.toFixed(1)}% · 还在手 ${p.heldPct.toFixed(1)}%`);
+  if (p.expireThisMonth > 0) {
+    L.push(p.showAbsolute ? `   ⚠ 其中 ${p.expireThisMonth} 分本月到期` : '   ⚠ 本月仍有将过期积分');
+  }
+  L.push('');
+
+  const gold = m.meals.filter((x) => x.tiers.gold && x.tiers.gold < x.tiers.list)
+    .map((x) => ({ ...x, save: x.tiers.list - x.tiers.gold }))
+    .sort((a, b) => b.save - a.save).slice(0, 3);
+  if (gold.length && !share) {
+    L.push('💳 麦金卡价差最大（同一商品在菜单里是两条 SKU，按名称归并）');
+    for (const g of gold) {
+      const t = g.tiers;
+      L.push(`   ${pad(ell(g.name, 20), 21)}原价 ¥${pad(t.list, 5)} → 麦金卡 ¥${pad(t.gold, 5)}  省 ¥${g.save.toFixed(1)}`);
+    }
+    L.push('');
+  }
+
+  const now = m.coupons.filter((c) => c.state === 'now');
+  const gift = m.coupons.filter((c) => c.state === 'gift');
+  const locked = m.coupons.filter((c) => c.state === 'locked');
+  L.push('→ 现在能吃：' + (now.length ? now.map((c) => `${c.displayTitle}${c.couponPrice ? ` ¥${c.couponPrice}` : ''}`).join('、') : '无'));
+  if (gift.length) L.push('→ 用不上就送人：' + gift.map((c) => c.displayTitle).join('、') + '（支持转赠，过期即作废）');
+  if (locked.length) L.push('→ 今天别指望：' + locked.map((c) => c.displayTitle).join('、'));
+  L.push('');
+  L.push(share
+    ? `   分享版已脱敏 · 参赛者独立开发，非麦当劳官方产品 · 以麦当劳 App 为准`
+    : '→ 说「权益账单」看全部　→ 说「生成卡片」出分享版');
+  return L.join('\n');
+}

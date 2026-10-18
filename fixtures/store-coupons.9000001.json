@@ -1,0 +1,22 @@
+{
+  "success": true,
+  "code": 200,
+  "message": "请求成功",
+  "datetime": "2026-10-18 17:08:58",
+  "traceId": "4c35e26ad2d996aca3aad03ab7d22f44",
+  "data": [
+    {
+      "title": "9.9元中杯冰美式",
+      "couponId": "ee3e7af7fbed34fa2a95d99948781ec6",
+      "couponCode": "FIXTURE-COUPON-EE3E7AF7",
+      "tradeDateTime": "2026-10-12 00:00:00-2026-10-18 23:59:59",
+      "products": [
+        {
+          "productCode": "507411",
+          "productName": "麦咖啡™冰美式中杯"
+        }
+      ],
+      "promotionId": "112023002"
+    }
+  ]
+}
