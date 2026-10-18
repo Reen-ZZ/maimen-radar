@@ -77,42 +77,31 @@
 
 ## 三步上手（WorkBuddy 用户看这里）
 
-不需要装任何依赖、不需要打开终端。全程只做只读查询；写操作（领券）会先报数、等你点头。
+不需要装任何依赖。全程只做只读查询；写操作（领券）会先报数、等你点头。
 
-### 第 1 步 · 领一个 MCP Token（1 分钟）
+### 一句话安装
 
-1. 打开 <https://open.mcd.cn/mcp> → 右上角【登录】→ 手机号验证
-2. 右上角变为【控制台】→ 点开 → 【激活】→ 同意服务协议
-3. 复制 MCP Token
-
-### 第 2 步 · 给 WorkBuddy 添加 MCP 连接器
-
-打开 WorkBuddy 的**连接器管理**，新建一个自定义 MCP 服务端，粘贴（内容同仓库里的 `mcp-config.example.json`）：
-
-```json
-{
-  "mcpServers": {
-    "mcd-mcp": {
-      "type": "streamablehttp",
-      "url": "https://mcp.mcd.cn",
-      "headers": { "Authorization": "Bearer 把你的Token粘到这里" }
-    }
-  }
-}
+```bash
+git clone https://github.com/Reen-ZZ/maimen-radar.git && cp -r maimen-radar ~/.workbuddy/skills/
 ```
 
-> 🔒 **Token 只存在你本地**：别提交进任何仓库、别贴进 AI 聊天窗口、别发到网上（《麦当劳 MCP 服务规则》第二条 2 款）。配置保存后按客户端提示启用（信任）该服务端。
->
-> 进阶：也可以把 Token 设为用户环境变量 `MCD_MCP_TOKEN`（命令行 `setx MCD_MCP_TOKEN <你的Token>` 后**重启 WorkBuddy**），配置里改写 `${MCD_MCP_TOKEN}`。两种方式效果一样，选顺手的。
+（Windows 为 `%USERPROFILE%\.workbuddy\skills\`；MCP Token 配置见下文第 2 步。）
 
-### 第 3 步 · 安装 Skill
+### 1. 申请麦当劳 MCP Token（1 分钟）
 
-把本仓库下载（clone）到本地任意目录，然后**任选其一**：
+前往麦当劳 MCP 开放平台 <https://open.mcd.cn/mcp>，手机号登录后进入【控制台】→【激活】→ 同意服务协议 → 复制 Token。
 
-- 在 WorkBuddy 对话里说："帮我把这个目录里的 `SKILL.md` 安装为技能"，指向下载的文件夹；
-- 或手动把整个文件夹复制到 `~/.workbuddy/skills/maimen-radar/`。
+### 2. 配置 MCP 连接
 
-装好后直接开聊，先试这三句：
+在 WorkBuddy 左侧边栏【专家·技能·连接器】→【连接器】→ 右上角【自定义连接器】→【配置 MCP】中，
+填入 [`mcp-config.example.json`](mcp-config.example.json) 的内容，
+并把 `${MCD_MCP_TOKEN}` 替换为你的真实 Token，保存后【启用】。
+
+> 🔒 **Token 只存在你本地**：别提交进任何仓库、别贴进 AI 聊天窗口、别发到网上（《麦当劳 MCP 服务规则》第二条 2 款）。
+
+### 3. 开聊
+
+装好后在对话框里直接说「权益账单」即可触发。先试这三句：
 
 | 你说 | 它给 |
 |---|---|
