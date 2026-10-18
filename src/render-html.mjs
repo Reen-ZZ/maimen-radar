@@ -21,7 +21,7 @@ function segs(c, nowMin) {
   }).join('');
 }
 
-function row(c, nowMin, idx) {
+function row(c, nowMin) {
   const meta = [
     c.reasons[0],
     c.scopeTags.join('/'),
@@ -51,7 +51,7 @@ export function renderHTML(m) {
     .filter(({ pos }) => Math.abs(pos - Number(nowPct)) > 9)
     .map(({ h, pos }) => `<span class="tick" style="left:${pos.toFixed(2)}%">${String(h).padStart(2, '0')}:00</span>`).join('');
 
-  const rows = m.coupons.map((c, i) => row(c, nowMin, i)).join('');
+  const rows = m.coupons.map((c) => row(c, nowMin)).join('');
 
   const summary = ['now', 'later', 'gift', 'locked']
     .filter((k) => m.counts[k])

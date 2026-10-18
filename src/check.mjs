@@ -28,6 +28,9 @@ if (!storeFiles.length) {
 
 let fail = 0;
 console.log(`数据来源：${DIR}/\n`);
+
+const setDiff = (a, b) => [...a].filter((x) => !b.has(x));
+
 for (const f of storeFiles) {
   const code = f.match(/store-coupons\.(.+)\.json$/)[1];
   const official = load(f).data ?? [];
@@ -36,15 +39,26 @@ for (const f of storeFiles) {
   const model = buildModel({ couponsRaw: own, accountRaw, mealsRaw: meals, sceneBeType: 1,
     store: meta ? { code, name: meta.storeName } : { code, name: '(未知门店)' } });
 
-  const mine = new Set(model.coupons.filter((x) => x.state === 'now').map((x) => x.key));
-  const theirs = new Set(official.map((x) => x.couponId));
-  const onlyMine = [...mine].filter((k) => !theirs.has(k)).map((k) => model.coupons.find((x) => x.key === k).title);
-  const onlyTheirs = [...theirs].filter((k) => !mine.has(k)).map((k) => own.data.coupons.find((x) => x.id === k)?.title ?? k);
+  // 主口径：key（券包 id）vs couponId。两者同源性未经真实调用交叉验证（fixtures 里
+  // 两者都被替换成同一哈希，必然对得上），所以用券名做回退比对兜底：
+  //   键集合不相交但券名一致 → 降级为警告（同源性待真实数据验证）
+  //   券名也不一致 → 真失败
+  const mineKeys = new Set(model.coupons.filter((x) => x.state === 'now').map((x) => x.key));
+  const theirKeys = new Set(official.map((x) => x.couponId));
+  const mineTitles = new Set(model.coupons.filter((x) => x.state === 'now').map((x) => x.title));
+  const theirTitles = new Set(official.map((x) => x.title).filter(Boolean));
+  const keySpaceShared = mineKeys.size === 0 || theirKeys.size === 0
+    || setDiff(mineKeys, theirKeys).length < mineKeys.size || setDiff(theirKeys, mineKeys).length < theirKeys.size;
 
-  const ok = !onlyMine.length && !onlyTheirs.length;
-  console.log(`${ok ? '✓' : '✗'} ${code} ${meta?.storeName ?? ''}  官方放行 ${theirs.size} 张 / 模型判 now ${mine.size} 张`);
-  if (onlyMine.length) console.log(`    模型多判（官方滤掉了，我们说能用）: ${onlyMine.join(', ')}`);
-  if (onlyTheirs.length) console.log(`    模型漏判（官方说能用，我们说不能）: ${onlyTheirs.join(', ')}`);
+  const onlyMineTitles = setDiff(mineTitles, theirTitles);
+  const onlyTheirsTitles = setDiff(theirTitles, mineTitles);
+  const ok = !onlyMineTitles.length && !onlyTheirsTitles.length;
+  console.log(`${ok ? '✓' : '✗'} ${code} ${meta?.storeName ?? ''}  官方放行 ${theirKeys.size} 张 / 模型判 now ${mineKeys.size} 张`);
+  if (ok && !keySpaceShared) {
+    console.log('    ⚠ 键空间不相交：id 与 couponId 同源性未经验证，本次按券名比对一致（真实数据下需复核）');
+  }
+  if (onlyMineTitles.length) console.log(`    模型多判（官方滤掉了，我们说能用）: ${onlyMineTitles.join(', ')}`);
+  if (onlyTheirsTitles.length) console.log(`    模型漏判（官方说能用，我们说不能）: ${onlyTheirsTitles.join(', ')}`);
   if (!ok) fail++;
 }
 

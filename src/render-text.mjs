@@ -46,10 +46,11 @@ function bar(coupon, nowMin) {
 }
 
 function axis() {
+  // 刻度与 bar() 同一坐标系：cell i 覆盖 [i*45, (i+1)*45) 分钟。
+  // 12:00 → cell 16，24:00 是最后 cell 的右边缘 → 标签占末两格。
   const line = new Array(W).fill(' ');
-  for (const h of [0, 12, 24]) {
-    const i = Math.min(W - 2, Math.round((h / 24) * (W - 2)));
-    line.splice(i, 2, ...String(h).padStart(2, '0').split(''));
+  for (const [h, at] of [[0, 0], [12, 16], [24, W - 2]]) {
+    line.splice(at, 2, ...String(h).padStart(2, '0').split(''));
   }
   return line.join('');
 }
@@ -68,6 +69,7 @@ export function renderText(m) {
 
   L.push(`📡 麦门雷达 · ${m.reportName}${share ? '（分享版）' : ''}`);
   L.push(`   ${m.nowText} ${m.weekdayLabel} · ${ell(m.store.name, 26)} · 券 ${m.coupons.length} 张`);
+  if (m.couponsNote) L.push(`   ⚠ ${m.couponsNote}`);
   L.push('');
 
   L.push('   可用窗口            ' + axis());

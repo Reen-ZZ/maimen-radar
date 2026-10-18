@@ -30,7 +30,7 @@ function maskCode(code) {
   return `${s.slice(0, 3)}${'•'.repeat(s.length - 7)}${s.slice(-4)}`;
 }
 
-/** 把券的时段窗换算成今天的可用分钟区间 */
+/** 把券的时段窗换算成今天的可用分钟区间。跨午夜段（endTime ≤ startTime）拆成两段。 */
 function windowsToday(coupon, now) {
   const periods = Array.isArray(coupon.tradeTimePeriods) ? coupon.tradeTimePeriods : [];
   const toMin = (t) => {
@@ -40,7 +40,14 @@ function windowsToday(coupon, now) {
   let wins = periods.map((p) => ({ from: toMin(p.startTime), to: toMin(p.endTime) }))
     .filter((w) => w.from !== null && w.to !== null);
   if (!wins.length || Number(coupon.isAllTradeTime) === 1) wins = [{ from: 0, to: 1440 }];
-  return wins.filter((w) => w.to > w.from);
+  const fixed = [];
+  for (const w of wins) {
+    if (w.to > w.from) { fixed.push(w); continue; }
+    // 跨午夜：22:00-02:00 → [22:00,24:00) + [00:00,02:00)
+    if (w.to > 0) fixed.push({ from: 0, to: w.to });
+    if (w.from < 1440) fixed.push({ from: w.from, to: 1440 });
+  }
+  return fixed;
 }
 
 /** 把 [2,3,4,5,6] 压成「周二~周六」 */
@@ -83,11 +90,29 @@ const genericStore = () => '一家麦当劳餐厅';
 export const REPORT_NAME = '权益账单';
 
 /**
+ * available-coupons 用 success:false + code:499 表达「没有可领的券」——稳定语义，不是故障。
+ * 实测三次重试结果一致（见 references/fields.md）。按标准错误处理会给用户弹「服务异常」。
+ */
+export function isNoCouponsAvailable(raw) {
+  return raw?.success === false && Number(raw?.code) === 499;
+}
+
+/**
  * beTypes 与官方 query-store-coupons 的门店场景过滤一致。
  * 官方枚举：1-到店自取 2-麦乐送 5-得来速 6-企业团餐；3/4 官方未公开含义。
  * 未命中当前场景时只说「不支持当前取餐方式」，不猜具体含义。
  */
 const BETYPE_NAME = { 1: '到店自取', 2: '麦乐送', 5: '得来速', 6: '企业团餐' };
+
+/**
+ * 生效起始时间。优先结构化字段 tradeStartDateTime；
+ * 若未来只给 datetimeText（"2026-10-12 00:00-2026-10-18 23:59"），取左侧兜底。
+ */
+function parseStart(c) {
+  if (c.tradeStartDateTime) return parseServerTime(c.tradeStartDateTime);
+  const m = String(c.datetimeText ?? '').match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})/);
+  return m ? parseServerTime(`${m[1]} ${m[2]}:${m[3]}:00`) : null;
+}
 
 function classify(coupon, now, sceneBeType = 1) {
   const reasons = [];
@@ -109,13 +134,22 @@ function classify(coupon, now, sceneBeType = 1) {
   const quota = Number(coupon.currentDayAvailableCount ?? 1);
   if (quota <= 0) reasons.push('今日次数已用完');
 
+  const startAt = parseStart(coupon);
+  const notStarted = startAt !== null && now < startAt;
+  if (notStarted) {
+    const hm = startAt.getHours() || startAt.getMinutes()
+      ? ` ${String(startAt.getHours()).padStart(2, '0')}:${String(startAt.getMinutes()).padStart(2, '0')}` : '';
+    reasons.push(`${startAt.getMonth() + 1}月${startAt.getDate()}日${hm} 生效，还没到`);
+  }
+
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const wins = windowsToday(coupon, now);
   const inWin = wins.some((w) => nowMin >= w.from && nowMin < w.to);
   const future = wins.filter((w) => nowMin < w.from).sort((a, b) => a.from - b.from)[0];
 
   let state;
-  if (!dayOk) state = 'locked';
+  if (notStarted) state = startAt.toDateString() === now.toDateString() ? 'later' : 'locked';
+  else if (!dayOk) state = 'locked';
   else if (!sceneOk) state = 'locked';
   else if (!enabled) state = 'locked';
   else if (quota <= 0) state = 'locked';
@@ -144,6 +178,12 @@ function hoursLeftText(endAt, now) {
 
 export function buildModel({ couponsRaw, accountRaw, mealsRaw, store, serverNow, share = false, sceneBeType = 1 }) {
   const now = serverNow ?? parseServerTime(couponsRaw?.datetime) ?? new Date();
+  // code:499 =「无券可领/券包为空」，稳定语义非故障；其余 success:false 才是接口异常
+  const couponsNote = (couponsRaw?.success === false)
+    ? (isNoCouponsAvailable(couponsRaw)
+      ? '券包当前为空（服务端 code:499，稳定语义非故障）'
+      : `券包接口返回异常 code:${couponsRaw?.code ?? '?'}，以下结果不可信`)
+    : '';
   const coupons = (couponsRaw?.data?.coupons ?? []).map((c) => {
     const cls = classify(c, now, sceneBeType);
     const endAt = parseServerTime(c.tradeEndDateTime);
@@ -222,6 +262,7 @@ export function buildModel({ couponsRaw, accountRaw, mealsRaw, store, serverNow,
 
   return {
     share,
+    couponsNote,
     sceneBeType: Number(sceneBeType),
     sceneName: BETYPE_NAME[Number(sceneBeType)] ?? '到店自取',
     reportName: REPORT_NAME,

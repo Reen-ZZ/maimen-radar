@@ -31,7 +31,7 @@ description: 麦门雷达 —— 麦当劳权益的「可用窗口」雷达。�
 
 | 维度 | 字段 | 不满足时 |
 |---|---|---|
-| 有效期 | `tradeEndDateTime` | 过期即出局 |
+| 有效期 | `tradeStartDateTime`（缺失时取 `datetimeText` 左侧）→ `tradeEndDateTime` | 未生效或过期即出局 |
 | 星期窗 | `weekdays`（空数组＝不限） | `locked` |
 | 时段窗 | `tradeTimePeriods` + `isAllTradeTime` | 未到＝`later`，已过＝`locked` |
 | 当日余量 | `currentDayAvailableCount` | 0 即 `locked` |

@@ -43,7 +43,10 @@ if (!existsSync(join(ROOT, 'src')) && !existsSync(join(ROOT, 'tools'))) bad('缺
 else ok('源代码目录存在');
 
 console.log('\n【2】CONTEST_DECLARATION.md 是否被改动');
-const sha = createHash('sha256').update(readFileSync(join(ROOT, 'CONTEST_DECLARATION.md'))).digest('hex');
+// 哈希前归一化换行符：官方原件是 LF，Windows 检出/编辑会变 CRLF，
+// 内容没改也会误报 —— 只比较内容，不比较换行风格。
+const declText = readFileSync(join(ROOT, 'CONTEST_DECLARATION.md'), 'utf8');
+const sha = createHash('sha256').update(declText.replace(/\r\n/g, '\n')).digest('hex');
 sha === OFFICIAL_DECL_SHA ? ok('sha256 与官方原件一致') : bad(`内容被改动！${sha}`);
 
 console.log('\n【3】密钥与敏感信息泄漏');
@@ -88,7 +91,7 @@ if (!leaks) ok('未发现 Token / 完整券码 / accountId 泄漏');
 
 console.log('\n【4】.gitignore 覆盖');
 const gi = existsSync(join(ROOT, '.gitignore')) ? readFileSync(join(ROOT, '.gitignore'), 'utf8') : '';
-for (const need of ['.env', 'out/', 'node_modules', 'docs/', 'dist/']) {
+for (const need of ['.env', 'out/', 'node_modules', 'docs/', 'dist/', 'state/']) {
   gi.includes(need) ? ok(`.gitignore 含 ${need}`) : bad(`.gitignore 缺 ${need}`);
 }
 const outDir = join(ROOT, 'out');
@@ -112,7 +115,7 @@ for (const doc of ['README.md', 'MCP_INTEGRATION.md', 'SKILL.md']) {
 }
 
 console.log('\n【6】命令与离线可用性（README 承诺的每条命令）');
-for (const f of ['tools/probe-mcp.mjs', 'tools/make-fixtures.mjs', 'src/check.mjs', 'src/demo.mjs', 'src/data.mjs', 'src/preflight.mjs']) {
+for (const f of ['tools/probe-mcp.mjs', 'tools/make-fixtures.mjs', 'src/check.mjs', 'src/demo.mjs', 'src/wake.mjs', 'src/data.mjs', 'src/state.mjs', 'src/preflight.mjs']) {
   existsSync(join(ROOT, f)) ? ok(`node ${f}`) : bad(`README 承诺的 ${f} 不存在`);
 }
 // 刚 clone 的人没有 out/，必须靠 fixtures/ 跑通

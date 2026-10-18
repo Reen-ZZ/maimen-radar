@@ -61,6 +61,7 @@ class McpClient {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(30000), // 30s 超时：悬挂连接比失败更耽误排障
     });
 
     const newSession = res.headers.get('mcp-session-id');
@@ -260,6 +261,7 @@ async function main() {
 
 main().catch((e) => {
   console.error(`\n✗ ${e.message}`);
+  if (e.name === 'TimeoutError') console.error('  → 请求 30 秒未响应，检查网络或降低调用频率后重试');
   if (/401/.test(e.message)) console.error('  → 检查 .env 里的 MCD_MCP_TOKEN 是否有效（控制台重新激活）');
   if (/429/.test(e.message)) console.error('  → 降频重试，上限 600 次/分钟');
   process.exit(1);
