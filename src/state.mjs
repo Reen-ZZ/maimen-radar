@@ -96,8 +96,8 @@ export function diff(prev, model) {
   return { firstRun: false, needStore, daysSince, wasted, arrived, revived, newlyLocked, pointsLost };
 }
 
-/** 冷启动引导第②步：补门店。放在抬头第二行，一次只推进这一步，不追问。 */
-const STORE_HINT = '→ 还差一家常去的店：说「绑店」或直接报门店名/城市，我才能判今天哪家能用';
+/** 冷启动引导第②步。有收藏门店时模型会静默采用并在回复里明示，这里只给一句告知，绝不追问。 */
+const STORE_HINT = '→ 下一句起按你的收藏门店判定（会告诉你是哪家），换店随时说一声';
 
 /** 三行抬头。超过三行就是刷屏，播报越克制用户越信它。 */
 export function wakeLines(d, model) {
