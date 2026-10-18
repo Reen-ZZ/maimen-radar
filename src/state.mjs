@@ -65,8 +65,11 @@ const num = (v) => (v === undefined || v === null || v === '' ? 0 : Number(v));
  * 播报只消费这里的结论，不自己解析原始响应。
  */
 export function diff(prev, model) {
+  // needStore：没有门店就没有「此刻这家店真能用哪张」——它是"今天吃啥/划算吗"的前置条件。
+  // 冷启动引导第②步靠它驱动，不靠对话里临时猜。
+  const needStore = !(prev?.stores ?? []).length;
   if (!prev?.last_seen || !Object.keys(prev.coupons ?? {}).length) {
-    return { firstRun: true, daysSince: null, wasted: [], arrived: [], revived: [], newlyLocked: [], pointsLost: 0 };
+    return { firstRun: true, needStore, daysSince: null, wasted: [], arrived: [], revived: [], newlyLocked: [], pointsLost: 0 };
   }
 
   const t0 = mins(prev.last_seen);
@@ -90,19 +93,24 @@ export function diff(prev, model) {
 
   const pointsLost = Math.max(0, num(model.points.expired) - num(prev.points?.expired));
 
-  return { firstRun: false, daysSince, wasted, arrived, revived, newlyLocked, pointsLost };
+  return { firstRun: false, needStore, daysSince, wasted, arrived, revived, newlyLocked, pointsLost };
 }
+
+/** 冷启动引导第②步：补门店。放在抬头第二行，一次只推进这一步，不追问。 */
+const STORE_HINT = '→ 还差一家常去的店：说「绑店」或直接报门店名/城市，我才能判今天哪家能用';
 
 /** 三行抬头。超过三行就是刷屏，播报越克制用户越信它。 */
 export function wakeLines(d, model) {
   if (d.firstRun) {
     return [`📡 麦门雷达 · 第一次见面，先把你的券和积分扫了一遍`,
       `   ${model.coupons.length} 张券 · ${model.points.available} ${model.points.currency}`,
-      `   以后每次开口，我都会先替你想好这些。`];
+      // 缺门店时不说"以后都替你想好"，直接把下一步摆出来
+      d.needStore ? STORE_HINT : `   以后每次开口，我都会先替你想好这些。`];
   }
   const L = [];
   const gap = d.daysSince == null ? '' : d.daysSince < 1 ? '不到 1 天' : `${d.daysSince.toFixed(1)} 天`;
   L.push(`📡 麦门雷达 · 距上次${gap ? ` ${gap}` : '上次'}`);
+  if (d.needStore) L.push(STORE_HINT);
 
   const bad = [];
   if (d.wasted.length) bad.push(`${d.wasted.length} 张券已经不在了`);

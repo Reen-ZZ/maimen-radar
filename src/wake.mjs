@@ -65,3 +65,9 @@ console.log('');
 console.log(withCloser(renderText(model), kind));
 console.log('');
 console.log(`state 已写回：${join('state', 'maimen-radar.json')}（last_seen = ${model.trace.serverDatetime || model.nowText}）`);
+if (d.needStore) {
+  console.log('冷启动引导：第①步（账户级盘点）已完成，停在第②步补门店——'
+    + 'query-nearby-stores(searchType=1) 读收藏，无则 searchType=2 按城市+关键词，仍无则明示降级口径。');
+} else {
+  console.log('冷启动引导：已完成，常态唤醒（补算 → 四态 → 答题 → 写回）。');
+}
