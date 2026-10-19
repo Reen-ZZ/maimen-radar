@@ -112,6 +112,12 @@ export function renderText(m) {
   L.push('');
   L.push(share
     ? `   分享版已脱敏 · 以麦当劳 App 为准`
-    : '→ 说「权益账单」看全部　→ 说「生成卡片」出分享版');
+    : (() => {
+        // 引导下一句：与 SKILL.md 的 5 级优先表对齐（渲染层只覆盖数据可判的 2/3/5）
+        const next = p.expireThisMonth > 0 ? '「积分能换啥」看看这些分能换什么'
+          : m.coupons.some((c) => c.state === 'now') ? '「今天吃啥」看此刻那张怎么用'
+          : null;
+        return next ? `→ 说${next}　→ 说「生成卡片」出分享版` : '→ 说「生成卡片」出分享版';
+      })());
   return L.join('\n');
 }
