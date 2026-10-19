@@ -246,6 +246,9 @@ export function buildModel({ couponsRaw, accountRaw, mealsRaw, store, serverNow,
       const e = mealsRaw.data.meals[ref.code];
       if (!e) continue;
       const rec = mealIndex.get(e.name);
+      if (!rec) continue;
+      // 新品只认 "上新" 这一个精确 tag——"新升级""清爽上新"等营销 tag 语义不纯，不猜
+      if ((ref.tags ?? []).includes('上新')) rec.isNew = true;
       if ((ref.tags ?? []).includes('麦金卡')) rec.tiers.gold = Number(e.currentPrice);
     }
   }

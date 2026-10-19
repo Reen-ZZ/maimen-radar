@@ -98,7 +98,19 @@ export function renderText(m) {
     L.push('💳 麦金卡价差最大（同一商品在菜单里是两条 SKU，按名称归并）');
     for (const g of gold) {
       const t = g.tiers;
-      L.push(`   ${pad(ell(g.name, 20), 21)}原价 ¥${pad(t.list, 5)} → 麦金卡 ¥${pad(t.gold, 5)}  省 ¥${g.save.toFixed(1)}`);
+      L.push(`   ${pad(ell(g.name, 16), 17)}原价 ¥${pad(t.list, 6)}现价 ¥${pad(t.sale ?? '—', 6)}麦金卡 ¥${pad(t.gold, 5)} 省 ¥${g.save.toFixed(1)}`);
+    }
+    L.push('');
+  }
+
+  // 上新：引用 tags 精确等于 "上新" 的条目，全量展示（当期一般不超过 10 个）
+  const news = m.meals.filter((x) => x.isNew);
+  if (news.length) {
+    L.push(`🆕 上新 ${news.length} 项`);
+    for (const n of news) {
+      const t = n.tiers;
+      const gold = t.gold ? ` · 麦金卡 ¥${t.gold}` : '';
+      L.push(`   ${pad(ell(n.name, 24), 25)}现价 ¥${t.sale ?? t.list}${gold}`);
     }
     L.push('');
   }
