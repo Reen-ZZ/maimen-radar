@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const REQUIRED = ['README.md', 'CONTEST_DECLARATION.md', 'MCP_INTEGRATION.md', 'mcp-config.example.json'];
+const REQUIRED = ['README.md', 'CONTEST_DECLARATION.md', 'MCP_INTEGRATION.md', 'mcp-config.example.json', 'workbuddy.md'];
 const OFFICIAL_DECL_SHA = 'cd28101bcb29cc8fb24b372fe91ce6b42c4a1487a54e01f7ade0c8c6a84241b7';
 const IGNORED_DIRS = new Set(['node_modules', '.git', 'out', '.tmp', 'dist', 'docs']);
 
