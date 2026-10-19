@@ -21,6 +21,8 @@
 - **业务失败放在响应体**（`success:false` + `code`），`result.isError` 恒为 `false`——**任何走麦当劳 MCP 的代码都不得只靠 `isError` 判成败**（`available-coupons` 的 `code:499` 是同一套风格）。
 - **因此任何算价脚本不得回显入参**（券码可核销），结果落盘前必须把 `couponCode` 掩码。
 - **单位约定**：`calculate-price` 的金额字段**单位是分**；`query-meals.currentPrice` **单位是元**。混算必须显式换算（×100 / ÷100），换算点唯一。
+- **quantity 会被静默降件**（实测 `507411x2` → `productList:[{quantity:1, subtotal:990}]`，traceId `fa2b353d…`）：金额合理、无任何报错，基线自证也抓不到（无券那一枪同样被降件）。**必须逐单核对请求 quantity 与响应 `productList[].quantity` 总数**，不一致不得播到手价。
+- **productCode 可能被服务端归一化**（实测 `507411` → 响应里 `507410`）：quantity 比对按总件数，不按编码逐件对。
 - **样本落盘带时间戳**：同一张券多次报价互不覆盖（slug = 门店 + 券掩码 + 服务端 HHmmss），失败响应不落盘。
 - ✅ **2026-10-19 首次成功取证**（traceId `c081dcd0…`，麦辣券+双码）：响应 `data.{productOriginalPrice, productPrice, originalPrice, discount, price, productList[]}`，**单位是分**（`price: 1190` = ¥11.9）。对照样本：无券（`bbdf9a51…`）`price:2250, discount:0`；错配（`e1adeef3…`）`600012`；冰美式券（`add1f944…`）`price:990` = 券价 ¥9.9，与"现价−券价=省 ¥2.0"的估算交叉吻合。
 

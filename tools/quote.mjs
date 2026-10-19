@@ -180,6 +180,12 @@ try {
     throw new Error(`DISCOUNT_MISMATCH 服务端 discount 口径异常：原价 ¥${(orig / 100).toFixed(1)} − 到手 ¥${(price / 100).toFixed(1)} ≠ discount ¥${(disc / 100).toFixed(1)}`);
   }
 
+  // 闸④（BUG-9）：quantity 逐单核对——服务端会静默降件（实测要 2 杯、按 1 杯计价，productList
+  // 里 quantity:1 且金额只有一杯的钱），三道闸都抓不到它（基线那一枪同样被降件）。
+  // 服务端还可能归一化 productCode（实测 507411 → 507410），所以按**总件数**比对，不按编码逐件。
+  const wantTotal = params.items.reduce((s, it) => s + Number(it.quantity ?? 1), 0);
+  const gotTotal = (data?.data?.productList ?? []).reduce((s, p) => s + Number(p.quantity ?? 0), 0);
+
   // 成功：掩码后落盘 + 播报（省的口径 = 对菜单现价合计，与账单一致；对原价的 discount 只是服务端口径）
   // BUG-4 修正：slug 带服务端 datetime 的 HHmmss——同券多次报价不再互相覆盖，
   // 失败样本也绝不会被后来的成功"悄悄替换"（排障时最要命的性质）。
@@ -188,40 +194,52 @@ try {
   const slug = `${store}-${mask(coupon.id).replace(/•/g, '')}-${ts}`;
   mkdirSync(join(ROOT, 'out'), { recursive: true });
   writeFileSync(join(ROOT, 'out', `quote.${slug}.json`), JSON.stringify(deepMask(data), null, 2));
-  // BUG-7 修正：比现价的口径按全部 items 的菜单现价合计算，不再只取 items[0]
+
+  if (gotTotal !== wantTotal) {
+    // BUG-9 处置：金额合理但数量被降 → 不播到手价，只说明事实（stdout 人话，细节进 stderr）
+    console.error(`[quote] quantity 静默降件：请求 ${wantTotal} 件，服务端按 ${gotTotal} 件计价（productList 已核对）`);
+    console.log(`⚠ 服务端这次只按 ${gotTotal} 件计了价（你要 ${wantTotal} 件），这个金额不是你要的到手价。`);
+    console.log(`   样本已留存排障。多件部分请分开下单，或到麦当劳 App 结算页看真实合计。`);
+    process.exit(0);
+  }
+
+  // BUG-10 修正：比现价的口径按全部 items 的菜单现价 × 各自数量 合计算，不再只取 items[0]、不漏乘数量
   const meals = read('out/query-meals.json');
   const menuFen = params.items.reduce((sum, it) => {
     const m = meals?.data?.meals?.[it.productCode];
-    return m?.currentPrice != null ? sum + Math.round(Number(m.currentPrice) * 100) : sum;
+    return m?.currentPrice != null ? sum + Math.round(Number(m.currentPrice) * 100) * Number(it.quantity ?? 1) : sum;
   }, 0);
   console.log(`✓ 到手 ¥${(price / 100).toFixed(1)}（券已生效）`);
   if (menuFen > 0) console.log(`   菜单现价合计 ¥${(menuFen / 100).toFixed(1)}，比现价省 ¥${((menuFen - price) / 100).toFixed(1)}；服务端 discount ¥${(disc / 100).toFixed(1)} 是对原价 ¥${(orig / 100).toFixed(1)} 的口径`);
   console.log(`   明细存 out/quote.${slug}.json（couponCode 已掩码）`);
 } catch (e) {
-  // 失败：业务码翻译成人话（不打印 ✓），再走"菜单现价估算"回退
+  // BUG-11 修正：stdout 只有人话，技术细节（原始 code/message）全部走 stderr
   const raw = String(e.message ?? e).replace(/MCD[0-9A-Z]{8,}/g, (s) => mask(s));
+  console.error(`[quote] ${raw}`);
   const HUMAN = {
-    '600010': '这张券的核销凭证不完整（couponId/couponCode 需成对），是调用侧漏传',
-    '600012': '这张券不能用在指定商品上',
-    '600022': '暂不支持多张券组合报价（BUG-5 实测：每件商品都挂同一张券的双码会被读成多张券；已改为只挂第一件，仍报错则服务端不支持组合报价）',
-    DISCOUNT_ZERO: '券没生效——服务端返回的是无券价，不能当到手价',
+    '600010': '这张券暂时算不了到手价。',
+    '600012': '这张券不能用在指定商品上。',
+    '600022': '暂时不支持多件商品组合用券。',
+    DISCOUNT_ZERO: '这张券没生效——算出来的是没有优惠的价格，不能当到手价。',
+    BASELINE_FAIL: '服务端返回的数据不完整，先不播金额。',
+    DISCOUNT_MISMATCH: '服务端返回的数据对不上，先不播金额。',
   };
   const key = Object.keys(HUMAN).find((k) => raw.startsWith(k)) ?? (raw.match(/\b(6000\d\d)\b/) ?? [])[1];
-  console.log(`⚠ ${key && HUMAN[key] ? HUMAN[key] + `（服务端 ${key.split(' ')[0]}）` : raw.slice(0, 200)}`);
+  console.log(`⚠ ${key ? HUMAN[key] : '服务端这次没算出来，先不播金额。'}`);
 
-  // 回退估算（BUG-6 修正）：多件按需求**求和**（不是取最大单件）；单位统一为分，只在显示时除 100
+  // 回退估算（BUG-6/10 修正）：多件按需求**求和 × 各自数量**；单位统一为分，只在显示时除 100
   const sc = read(`out/store-coupons.${store}.json`);
   const entry = (sc?.data ?? []).find((x) => x.couponId === coupon.id);
   const meals = read('out/query-meals.json');
-  const wanted = items.length ? items : (entry?.products ?? []).map((p) => ({ productCode: p.productCode }));
+  const wanted = items.length ? items : (entry?.products ?? []).map((p) => ({ productCode: p.productCode, quantity: 1 }));
   let estFen = null;
   for (const it of wanted) {
     const m = meals?.data?.meals?.[it.productCode];
-    if (m?.currentPrice != null) estFen = (estFen ?? 0) + Math.round(Number(m.currentPrice) * 100);
+    if (m?.currentPrice != null) estFen = (estFen ?? 0) + Math.round(Number(m.currentPrice) * 100) * Number(it.quantity ?? 1);
   }
   const cpFen = coupon.discountInfo?.discountValue != null ? Math.round(Number(coupon.discountInfo.discountValue) * 100) : null;
   if (estFen != null && cpFen != null) {
-    console.log(`按菜单现价估：${wanted.length} 件合计 ¥${(estFen / 100).toFixed(1)} − 券价 ¥${(cpFen / 100).toFixed(1)} = 省 ¥${((estFen - cpFen) / 100).toFixed(1)}（各件现价直加的粗估；多件时券的实际分摊以麦当劳 App 结算为准）。`);
+    console.log(`按菜单现价估：${wanted.reduce((s, it) => s + Number(it.quantity ?? 1), 0)} 件合计 ¥${(estFen / 100).toFixed(1)} − 券价 ¥${(cpFen / 100).toFixed(1)} = 省 ¥${((estFen - cpFen) / 100).toFixed(1)}（各件现价直加的粗估；多件时券的实际分摊以麦当劳 App 结算为准）。`);
   } else {
     console.log('菜单里也找不到可估的现价——这类组合券只能到 App 结算页看真实到手价。');
   }
