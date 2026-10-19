@@ -45,7 +45,7 @@ const model = buildModel({
   mealsRaw,
   storeCouponsRaw,
   store: pick ? { code: pick.storeCode, name: pick.storeName } : null,
-  sceneBeType: prev.sceneBeType ?? 1,
+  sceneBeType: 1, // 核心设计只判到店
 });
 
 // ── 4. 写回 state（diff 要先算，写回会覆盖 prev）──

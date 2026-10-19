@@ -36,7 +36,7 @@ Token 只从本地 `.env` 读取，不写进仓库、不进对话、不托管到
 | 9 | `query-store-coupons` | `storeCode:"1420721", beType:1, orderType:1` | **1 张**可用 | 17:08:58 | `e6da45288e7b5383674270c50ddfb8c2` |
 | 10 | `query-store-coupons` | `storeCode:"1420370", beType:1, orderType:1` | **1 张**可用 | 17:08:59 | `f4cbcc8cf542b3a8a452c0062a8939f9` |
 
-**未执行的写操作 Tool**：`auto-bind-coupons`、`create-order`、`cancel-order` 在代码里已接好调用路径，但**本次未实际调用**——写操作须由用户明确确认后触发，而本文档的取证过程全程只读。这一点如实标注，不冒充已验证。
+**未执行的写操作 Tool**：`auto-bind-coupons` 是唯一接入的写操作（领券路由，须用户先看到报数再确认）；`create-order` / `cancel-order` **不接入、不调用**——核心设计只判到店权益，不做下单与外送，点餐引导去麦当劳 App（本文档早期版本写"已接好调用路径"与事实不符，已修正）。取证过程全程只读，不冒充已验证。
 
 ## 3. 调用流程
 

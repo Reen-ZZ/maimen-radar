@@ -4,8 +4,9 @@
  *
  *   node src/eat.mjs                      # 默认：收藏第一家 + 到店自取
  *   node src/eat.mjs --store 1420370      # 指定门店
- *   node src/eat.mjs --be 2               # 外送场景（需 out/ 有对应 orderType=2 的数据）
  *   node src/eat.mjs --json               # 输出 top1 结构（含官方 image，供编排/卡片用）
+ *
+ * 核心设计：只判到店场景（beType=1）。外送、得来速、下单不在范围内——引导去麦当劳 App。
  *
  * 唯一产出路径：对话里说「今天吃啥」先跑本脚本，再按输出纪律复述，不许模型临场挑券。
  * 本脚本在任何路径下都不调算价通道（D4：只问不做，点头后才走 tools/quote.mjs）。
@@ -21,7 +22,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
 const asJson = argv.includes('--json');
 const storeArg = (() => { const i = argv.indexOf('--store'); return i >= 0 ? argv[i + 1] : null; })();
-const beArg = (() => { const i = argv.indexOf('--be'); return i >= 0 ? Number(argv[i + 1]) : null; })();
+// 核心设计只判到店：不接受 --be 切换外送场景（外送引导去麦当劳 App）
+const sceneBeType = 1;
 
 const SRC = sourceDir();
 if (!SRC) {
@@ -31,7 +33,7 @@ if (!SRC) {
 const read = (f) => { try { return load(f); } catch { return null; } };
 
 const state = loadState(ROOT);
-const sceneBeType = beArg ?? state.sceneBeType ?? 1;
+const sceneBeType = 1; // 核心设计只判到店（外送/得来速/下单不做，引导去麦当劳 App）
 const storesRaw = read('query-nearby-stores.json');
 const pick = storeArg
   ? (storesRaw?.data ?? []).find((s) => String(s.storeCode) === String(storeArg)) ?? null
