@@ -111,7 +111,7 @@ export function renderText(m) {
   if (locked.length) L.push('→ 今天别指望：' + locked.map((c) => c.displayTitle).join('、'));
   L.push('');
   L.push(share
-    ? `   分享版已脱敏 · 参赛者独立开发，非麦当劳官方产品 · 以麦当劳 App 为准`
+    ? `   分享版已脱敏 · 以麦当劳 App 为准`
     : '→ 说「权益账单」看全部　→ 说「生成卡片」出分享版');
   return L.join('\n');
 }

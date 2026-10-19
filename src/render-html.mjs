@@ -70,7 +70,7 @@ export function renderHTML(m) {
     m.share
       ? '分享版已脱敏：门店、券名、积分数值均为品类级信息'
       : `数据拉取 ${esc(m.trace.serverDatetime)} · 券码已脱敏`,
-    '参赛者独立开发，非麦当劳官方产品 · 价格与有效期以麦当劳 App 实时结果为准',
+    '价格与有效期以麦当劳 App 实时结果为准',
   ].map((t) => `<p>${esc(t)}</p>`).join('');
 
   return `<style>
