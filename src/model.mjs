@@ -6,9 +6,11 @@
 const BLOCKS = { full: '█', tail: '▓', empty: '░' };
 const TRACK = 32;
 
-/** 1=周一 … 7=周日（已用 2026-10-18 周日实测反推确认） */
+/** 官方 weekdays 映射：1=周日，2=周一 … 7=周六（即 JS getDay()+1）。
+ *  2026-10-19 周一实测判别：券 weekdays=[2,3,4,5,6]，官方周一放行，且券面写"周一、二、三、四、五"。
+ *  （2026-10-18 周日推断的"1=周一…7=周日"在周日与真映射同判，属欠定，已被推翻。） */
 function isoWeekday(d) {
-  return ((d.getDay() + 6) % 7) + 1;
+  return d.getDay() + 1;
 }
 
 function parseServerTime(s) {
@@ -52,7 +54,7 @@ function windowsToday(coupon, now) {
 
 /** 把 [2,3,4,5,6] 压成「周二~周六」 */
 function weekdayRange(weekdays) {
-  const NAME = ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+  const NAME = ['', '周日', '周一', '周二', '周三', '周四', '周五', '周六'];
   const sorted = [...new Set(weekdays.map(Number))].filter((n) => n >= 1 && n <= 7).sort((a, b) => a - b);
   if (!sorted.length) return '';
   const runs = [];
@@ -119,7 +121,7 @@ function classify(coupon, now, sceneBeType = 1) {
   const wd = isoWeekday(now);
   const weekdays = Array.isArray(coupon.weekdays) ? coupon.weekdays.map(Number) : [];
   const dayOk = !weekdays.length || weekdays.includes(wd);
-  if (!dayOk) reasons.push(`限${weekdayRange(weekdays)}可用，今天${['周一', '周二', '周三', '周四', '周五', '周六', '周日'][wd - 1]}不行`);
+  if (!dayOk) reasons.push(`限${weekdayRange(weekdays)}可用，今天${['周日', '周一', '周二', '周三', '周四', '周五', '周六'][wd - 1]}不行`);
 
   const beTypes = Array.isArray(coupon.beTypes) ? coupon.beTypes.map(Number) : [];
   const sceneOk = !beTypes.length || beTypes.includes(Number(sceneBeType));
