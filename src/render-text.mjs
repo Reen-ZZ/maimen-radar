@@ -98,7 +98,7 @@ export function renderText(m) {
     L.push('💳 麦金卡价差最大（同一商品在菜单里是两条 SKU，按名称归并）');
     for (const g of gold) {
       const t = g.tiers;
-      L.push(`   ${pad(ell(g.name, 16), 17)}原价 ¥${pad(t.list, 6)}现价 ¥${pad(t.sale ?? '—', 6)}麦金卡 ¥${pad(t.gold, 5)} 省 ¥${g.save.toFixed(1)}`);
+      L.push(`   ${pad(ell(g.name, 16), 17)}原价 ¥${pad(t.list, 6)}现价 ¥${pad(t.sale ?? '—', 6)}麦金卡 ¥${t.gold}`);
     }
     L.push('');
   }
