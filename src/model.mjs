@@ -295,6 +295,8 @@ export function buildModel({ couponsRaw, accountRaw, mealsRaw, storeCouponsRaw, 
           return {
             productCode: p.productCode,
             productName: p.productName ?? e?.name ?? '',
+            // 菜单侧真名：券侧 productName 与菜单 name 不保证一致（实测冰美式两样写法），阶梯查找必须用这个
+            menuName: e?.name ?? null,
             sale: rec?.tiers?.sale ?? null,
             image: e?.image ?? null,
             inMenu: rec?.tiers?.sale != null,
@@ -335,7 +337,8 @@ export function buildModel({ couponsRaw, accountRaw, mealsRaw, storeCouponsRaw, 
     let best = null;
     for (const mp of c.matchedProducts) {
       if (!mp.inMenu) continue;
-      const lad = couponLadder({ meals: [...mealIndex.values()] }, mp.productName, c.couponPrice);
+      // 用菜单侧真名查阶梯——券侧 productName 可能对不上（实测冰美式两种写法）
+      const lad = couponLadder({ meals: [...mealIndex.values()] }, mp.menuName ?? mp.productName, c.couponPrice);
       if (lad.realGain == null) continue;
       if (!best || lad.realGain > best.lad.realGain) best = { mp, lad };
     }
@@ -344,7 +347,7 @@ export function buildModel({ couponsRaw, accountRaw, mealsRaw, storeCouponsRaw, 
       c.verdict = best.lad.verdict;
       c.ladderProduct = {
         code: best.mp.productCode,
-        name: best.mp.productName,
+        name: best.mp.menuName ?? best.mp.productName,
         sale: best.lad.sale,
         image: best.mp.image,
       };
