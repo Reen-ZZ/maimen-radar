@@ -38,11 +38,14 @@ if (storeArg && !pick) {
   console.error(`✗ 没有门店 ${storeArg}。可用：${stores.map((s) => s.storeCode + ' ' + s.storeName).join(' / ')}`);
   process.exit(1);
 }
+// 券价叠加的数据源：指定/默认门店的官方可用券（无此文件则静默降级为不显示增益）
+const storeCouponsRaw = pick ? read(`store-coupons.${pick.storeCode}.json`) : null;
 
 const model = buildModel({
   couponsRaw,
   accountRaw: accountRaw ?? { data: {} },
   mealsRaw: mealsRaw ?? { data: {} },
+  storeCouponsRaw,
   store: pick ? { code: pick.storeCode, name: pick.storeName } : null,
   share,
 });

@@ -178,7 +178,7 @@ function hoursLeftText(endAt, now) {
   return `剩 ${Math.ceil(h / 24)} 天`;
 }
 
-export function buildModel({ couponsRaw, accountRaw, mealsRaw, store, serverNow, share = false, sceneBeType = 1 }) {
+export function buildModel({ couponsRaw, accountRaw, mealsRaw, storeCouponsRaw, store, serverNow, share = false, sceneBeType = 1 }) {
   const now = serverNow ?? parseServerTime(couponsRaw?.datetime) ?? new Date();
   // code:499 =「无券可领/券包为空」，稳定语义非故障；其余 success:false 才是接口异常
   const couponsNote = (couponsRaw?.success === false)
@@ -257,6 +257,28 @@ export function buildModel({ couponsRaw, accountRaw, mealsRaw, store, serverNow,
 
   const counts = coupons.reduce((a, c) => ((a[c.state] = (a[c.state] ?? 0) + 1), a), {});
   const nowMin = now.getHours() * 60 + now.getMinutes();
+
+  // 券价叠加：门店可用券按官方 couponId（= 券包 id，2026-10-19 实测同源）认亲，
+  // products[].productCode join 菜单得现价，真实增益 = 现价 − 券价。
+  // 无门店券数据时整段跳过，账单退化为不显示增益。
+  if (Array.isArray(storeCouponsRaw?.data)) {
+    const official = new Map(storeCouponsRaw.data.map((x) => [x.couponId, x]));
+    for (const c of coupons) {
+      const off = official.get(c.key);
+      if (!off || c.couponPrice == null) continue;
+      let sale = null;
+      for (const p of off.products ?? []) {
+        const e = mealsRaw?.data?.meals?.[p.productCode];
+        const rec = e ? mealIndex.get(e.name) : null;
+        const s = rec?.tiers?.sale;
+        if (s != null) sale = sale == null ? s : Math.min(sale, s);
+      }
+      if (sale == null) continue;
+      const gain = +(sale - c.couponPrice).toFixed(1);
+      c.realGain = gain;
+      c.verdict = gain <= 0 ? 'worthless' : gain < 3 ? 'marginal' : gain < 10 ? 'ok' : 'great';
+    }
+  }
 
   points.showAbsolute = !share;
   points.headline = share

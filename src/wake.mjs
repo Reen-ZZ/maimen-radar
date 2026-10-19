@@ -36,13 +36,14 @@ const mealsRaw = read('query-meals.json') ?? { data: {} };
 const storesRaw = read('query-nearby-stores.json');
 
 // ── 1+2+3. 补算 → 四态 → 答题 ──
+const pick = storesRaw?.data?.[0] ?? null;
+const storeCouponsRaw = pick ? read(`store-coupons.${pick.storeCode}.json`) : null;
 const model = buildModel({
   couponsRaw,
   accountRaw,
   mealsRaw,
-  store: storesRaw?.data?.[0]
-    ? { code: storesRaw.data[0].storeCode, name: storesRaw.data[0].storeName }
-    : null,
+  storeCouponsRaw,
+  store: pick ? { code: pick.storeCode, name: pick.storeName } : null,
 });
 
 // ── 4. 写回 state（diff 要先算，写回会覆盖 prev）──

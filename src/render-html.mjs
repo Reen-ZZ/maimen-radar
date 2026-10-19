@@ -26,6 +26,7 @@ function row(c, nowMin) {
     c.reasons[0],
     c.scopeTags.join('/'),
     c.couponPrice ? `用券 ¥${c.couponPrice}` : '',
+    c.realGain == null ? '' : c.realGain > 0 ? `省 ¥${c.realGain.toFixed(1)}` : '不省钱',
     c.quota ? `今日余 ${c.quota} 次` : '',
   ].filter(Boolean).join('<span class="dot-sep">·</span>');
 

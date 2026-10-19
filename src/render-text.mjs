@@ -77,8 +77,12 @@ export function renderText(m) {
   L.push('   ' + '─'.repeat(3 + 22 + W + 2));
   for (const c of m.coupons) {
     L.push(`   ${c.glyph} ${pad(ell(c.displayTitle, 20), 21)}${bar(c, nowMin)} ${share ? c.absoluteDue : c.countdown}`);
+    // 券价叠加：有门店券数据才算得出"省"，没有就整段不显示
+    const gain = c.realGain == null ? ''
+      : c.realGain > 0 ? ` · 省 ¥${c.realGain.toFixed(1)}${c.verdict === 'marginal' ? ' · 别为它专门跑一趟' : ''}`
+      : ' · 不省钱';
     const note = c.reasons[0] || c.scopeTags.join('/');
-    if (note) L.push(`      ↳ ${note}${c.couponPrice ? ` · 用券 ¥${c.couponPrice}` : ''}${c.quota ? ` · 今日余 ${c.quota} 次` : ''}`);
+    if (note) L.push(`      ↳ ${note}${c.couponPrice ? ` · 用券 ¥${c.couponPrice}` : ''}${gain}${c.quota ? ` · 今日余 ${c.quota} 次` : ''}`);
   }
   L.push('');
 
