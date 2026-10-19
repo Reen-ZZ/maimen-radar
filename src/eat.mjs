@@ -33,7 +33,6 @@ if (!SRC) {
 const read = (f) => { try { return load(f); } catch { return null; } };
 
 const state = loadState(ROOT);
-const sceneBeType = 1; // 核心设计只判到店（外送/得来速/下单不做，引导去麦当劳 App）
 const storesRaw = read('query-nearby-stores.json');
 const pick = storeArg
   ? (storesRaw?.data ?? []).find((s) => String(s.storeCode) === String(storeArg)) ?? null
