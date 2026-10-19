@@ -73,7 +73,7 @@ for (const f of storeFiles) {
   }
 }
 
-// 缺陷报告 MCD-DEF-001 离线断言：out/quote.*.json 必须是"券生效"样本（discount>0）且券码已掩码
+// 缺陷报告 MCD-DEF-001 离线断言：out/quote.*.json 检查券码掩码 + 样本有效性
 // （不打网络，用现成样本；out/ 不入库，本断言只在有真实数据的机器上有意义）
 if (existsSync('out')) {
   const quoteFiles = readdirSync('out').filter((f) => f.startsWith('quote.'));
@@ -81,11 +81,17 @@ if (existsSync('out')) {
     try {
       const q = JSON.parse(readFileSync(join('out', f), 'utf8'));
       const d = Number(q?.data?.discount);
-      const text = JSON.stringify(q);
-      const masked = !/MCD[0-9A-Z]{10,}/.test(text);
-      const okQ = q?.success === true && d > 0 && masked;
-      console.log(`${okQ ? '✓' : '✗'} quote 样本 ${f}: success=${q?.success} discount=${(d / 100).toFixed(1)}元 券码掩码=${masked ? '✓' : '✗ 明文泄漏'}`);
-      if (!okQ) fail++;
+      const masked = !/MCD[0-9A-Z]{10,}/.test(JSON.stringify(q));
+      if (!masked) { console.log(`✗ quote 样本 ${f}: 券码明文泄漏`); fail++; continue; }
+      if (q?.success !== true) {
+        console.log(`✗ quote 样本 ${f}: 是失败响应（code=${q?.code}），属缺陷 B 化石，应删除该文件`);
+        fail++; continue;
+      }
+      if (!(d > 0)) {
+        console.log(`✗ quote 样本 ${f}: discount=0（无券基线或券未生效）——基线请移出 quote. 前缀，未生效样本不该落盘`);
+        fail++; continue;
+      }
+      console.log(`✓ quote 样本 ${f}: success=true discount=${(d / 100).toFixed(1)}元 券码掩码=✓`);
     } catch { /* 样本损坏不阻塞其它断言 */ }
   }
 }

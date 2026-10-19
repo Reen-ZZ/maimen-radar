@@ -149,31 +149,44 @@ try {
   const bizFail = data?.success === false || (data?.code != null && Number(data.code) !== 200);
   if (result?.isError || bizFail) throw new Error(`${data?.code ?? 'ERR'} ${data?.message ?? ''}`.trim());
 
-  // 闸②（缺陷 A 防呆）：带券请求必须验证 discount > 0 —— 券生效的唯一可靠信号。
-  // 不带券/漏券码是合法输入，服务端会静默返回 200 + discount:0 + 无券价，不得当到手价播报。
+  // 闸②（BUG-1 修正）：服务端 discount 口径 = productOriginalPrice − price（原价 − 到手），
+  // 不是"无券价 − 到手价"。促销商品（现价 < 原价）下两者天然不等——冰美式 19−9.9=9.1 ✓。
   const price = Number(data?.data?.price);
   const orig = Number(data?.data?.productOriginalPrice ?? data?.data?.originalPrice);
   const disc = Number(data?.data?.discount);
 
-  // 闸②（缺陷 A 防呆）：本工具永远带双码，discount 必须 > 0 才算"券生效"。
-  const couponApplied = params.items.some((it) => it.couponCode);
-  if (couponApplied && !(disc > 0)) throw new Error('DISCOUNT_ZERO 券未生效，服务端返回的是无券价，不得作为到手价播报');
+  // 闸②（BUG-3 修正）：券缺 code 则 fail closed——判定依据是"券有没有 code"，不是"请求带没带"——
+  // 后者是自证循环：券缺 code 时 couponCode:undefined 被序列化丢弃，服务端按无券算，闸就永远不触发。
+  if (!coupon.code) {
+    console.log('⚠ 这张券在券包数据里没有可核销券码（code 字段缺失），带券到手价算不出来（fail closed）。');
+    process.exit(1);
+  }
 
-  // 闸③（§5.2 基线自证）：同一次连发"无券 + 带券"两枪，断言无券价 ≥ 带券价且差值 == discount。
-  // 不一致 = 数据自相矛盾（静默降级被自动发现），先不播金额。
+  // 闸③（BUG-1 修正后的基线自证）：同次连发"无券 + 带券"两枪。
+  // 券未生效的真信号是"带券价 == 无券价"（服务端按无券算，自洽但无意义）→ DISCOUNT_ZERO；
+  // 无券价低于带券价 = 自相矛盾；两者都不是才算数。不拿 discount 对 无券价−带券价 断言。
   const baseParams = JSON.parse(JSON.stringify(params));
   for (const it of baseParams.items) { delete it.couponId; delete it.couponCode; }
   const baseData = unwrap(await client.callTool('calculate-price', baseParams));
   const basePrice = Number(baseData?.data?.price);
-  if (!(basePrice >= price) || Math.abs((basePrice - price) - disc) > 1) {
-    throw new Error(`数据自相矛盾：无券价 ¥${(basePrice / 100).toFixed(1)} vs 带券价 ¥${(price / 100).toFixed(1)}，discount ¥${(disc / 100).toFixed(1)} —— 先不播金额`);
+  if (!Number.isFinite(basePrice)) throw new Error('BASELINE_FAIL 基线自证失败：无券响应缺 price');
+  if (basePrice < price) throw new Error(`数据自相矛盾：无券价 ¥${(basePrice / 100).toFixed(1)} 低于带券价 ¥${(price / 100).toFixed(1)}，先不播金额`);
+  if (basePrice === price) throw new Error('DISCOUNT_ZERO 券未生效：带券价 == 无券价，服务端返回的是无券结果');
+  if (Number.isFinite(orig) && Math.abs((orig - price) - disc) > 1) {
+    throw new Error(`DISCOUNT_MISMATCH 服务端 discount 口径异常：原价 ¥${(orig / 100).toFixed(1)} − 到手 ¥${(price / 100).toFixed(1)} ≠ discount ¥${(disc / 100).toFixed(1)}`);
   }
 
-  // 成功：掩码后落盘 + 到手价播报
+  // 成功：掩码后落盘 + 播报（省的口径 = 对菜单现价，与账单一致；对原价的 discount 只是服务端口径）
   const slug = `${store}-${mask(coupon.id).replace(/•/g, '')}`;
   mkdirSync(join(ROOT, 'out'), { recursive: true });
   writeFileSync(join(ROOT, 'out', `quote.${slug}.json`), JSON.stringify(deepMask(data), null, 2));
-  console.log(`✓ 到手 ¥${(price / 100).toFixed(1)}（原价 ¥${(orig / 100).toFixed(1)}，券已生效，省 ¥${(disc / 100).toFixed(1)}），明细存 out/quote.${slug}.json（couponCode 已掩码）`);
+  const meals = read('out/query-meals.json');
+  const firstItem = params.items[0];
+  const menuPrice = Number(meals?.data?.meals?.[firstItem?.productCode]?.currentPrice);
+  const vsMenu = Number.isFinite(menuPrice) ? `菜单现价 ¥${menuPrice.toFixed(1)}，比现价省 ¥${(menuPrice - price / 100).toFixed(1)}` : null;
+  console.log(`✓ 到手 ¥${(price / 100).toFixed(1)}（券已生效）`);
+  if (vsMenu) console.log(`   ${vsMenu}；服务端 discount ¥${(disc / 100).toFixed(1)} 是对原价 ¥${(orig / 100).toFixed(1)} 的口径`);
+  console.log(`   明细存 out/quote.${slug}.json（couponCode 已掩码）`);
 } catch (e) {
   // 失败：业务码翻译成人话（不打印 ✓），再走"菜单现价估算"回退
   const raw = String(e.message ?? e).replace(/MCD[0-9A-Z]{8,}/g, (s) => mask(s));
