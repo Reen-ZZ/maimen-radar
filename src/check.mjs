@@ -73,6 +73,23 @@ for (const f of storeFiles) {
   }
 }
 
+// 缺陷报告 MCD-DEF-001 离线断言：out/quote.*.json 必须是"券生效"样本（discount>0）且券码已掩码
+// （不打网络，用现成样本；out/ 不入库，本断言只在有真实数据的机器上有意义）
+if (existsSync('out')) {
+  const quoteFiles = readdirSync('out').filter((f) => f.startsWith('quote.'));
+  for (const f of quoteFiles) {
+    try {
+      const q = JSON.parse(readFileSync(join('out', f), 'utf8'));
+      const d = Number(q?.data?.discount);
+      const text = JSON.stringify(q);
+      const masked = !/MCD[0-9A-Z]{10,}/.test(text);
+      const okQ = q?.success === true && d > 0 && masked;
+      console.log(`${okQ ? '✓' : '✗'} quote 样本 ${f}: success=${q?.success} discount=${(d / 100).toFixed(1)}元 券码掩码=${masked ? '✓' : '✗ 明文泄漏'}`);
+      if (!okQ) fail++;
+    } catch { /* 样本损坏不阻塞其它断言 */ }
+  }
+}
+
 const p = accountRaw.data;
 const sum = Number(p.usedPoint) + Number(p.expiredPoint) + Number(p.availablePoint);
 const closed = Math.abs(sum - Number(p.accumulativePoint)) < 0.01;

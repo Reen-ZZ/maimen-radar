@@ -13,12 +13,14 @@
 - `query-meal-detail(code=9900016534)` 返回 `code,name,rounds[],image,supportModify`，`rounds[].choices[]` 带 `diffPrice/isDefault`，但**没有价格字段**。
 - 这类券**不许显示"省 ¥X"**——算不出就直说"菜单里没标价，要我先算到手价吗"。
 
-## 到手价需双码
+## 到手价需双码（⚠ 静默陷阱：业务失败不抛错）
 
-- `calculate-price` 只给 `couponId` 会被拒：`600010 使用优惠券需要couponId和couponCode`。
+- `calculate-price` 只给 `couponId` 会被拒：`600010 使用优惠券需要couponId和couponCode`；错配商品报 `600012 促销规则不支持该商品`。
 - `items[]` 支持 `couponId/couponCode/productCode/quantity/roundList/modification/withOrder`，**双码按 item 挂**。
+- **不带券是完全合法的输入**：返回 `200 + discount:0 + price=无券价`，没有任何"你没带券"的提示。**`discount > 0` 是"券真的生效了"的唯一可靠信号**。
+- **业务失败放在响应体**（`success:false` + `code`），`result.isError` 恒为 `false`——**任何走麦当劳 MCP 的代码都不得只靠 `isError` 判成败**（`available-coupons` 的 `code:499` 是同一套风格）。
 - **因此任何算价脚本不得回显入参**（券码可核销），结果落盘前必须把 `couponCode` 掩码。
-- ✅ **2026-10-19 首次成功取证**（traceId `add1f944…`，冰美式券+双码）：响应 `data.{productOriginalPrice, productPrice, originalPrice, discount, price, productList[]}`，**单位是分**（`price: 990` = ¥9.9）。到手价 ¥9.9 == 券价 → 与"现价−券价"的估算（省 ¥2.0）交叉吻合。不带双码时服务端不报错、只返回无券价格（productPrice=现价）——**静默陷阱：算价必须核对手里有没有带券**。
+- ✅ **2026-10-19 首次成功取证**（traceId `c081dcd0…`，麦辣券+双码）：响应 `data.{productOriginalPrice, productPrice, originalPrice, discount, price, productList[]}`，**单位是分**（`price: 1190` = ¥11.9）。对照样本：无券（`bbdf9a51…`）`price:2250, discount:0`；错配（`e1adeef3…`）`600012`；冰美式券（`add1f944…`）`price:990` = 券价 ¥9.9，与"现价−券价=省 ¥2.0"的估算交叉吻合。
 
 ## 券侧商品名 ≠ 菜单侧实体名
 

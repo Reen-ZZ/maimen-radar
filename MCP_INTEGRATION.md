@@ -113,7 +113,8 @@ $ node src/check.mjs
 | join 断链 | `9900016534`（任选组合）不在菜单字典与引用里 | 该类券不显示"省"，只给问话 |
 | 券侧名 ≠ 菜单名 | "麦咖啡™冰美式中杯" vs "麦咖啡™美式" | join 走 `productCode`，阶梯用菜单侧真名 |
 | `frequent` 锚点 | `data.frequent = {code:"9900013304", tags:["我的常点"]}` | 排序破平局项（fields.md 已记） |
-| `calculate-price` 600010 | 只给 `couponId` 被拒，需 `couponId+couponCode` 双码 | 算价脚本不得回显入参；成功结构待取证 |
+| `calculate-price` 600010 | 只给 `couponId` 被拒，需 `couponId+couponCode` 双码 | 算价脚本不得回显入参；成功结构已取证（单位分） |
+| **静默陷阱（MCD-DEF-001）** | 不带券是合法输入：`200 + discount:0 + 无券价`；错配商品 `600012`；`isError` 恒 false | `discount>0` 是券生效唯一信号；业务失败看响应体；quote.mjs 已加三道闸（bizFail / DISCOUNT_ZERO / 基线自证） |
 
 ## 6. 业务价值
 

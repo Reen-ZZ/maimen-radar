@@ -143,17 +143,49 @@ try {
 
   const result = await client.callTool('calculate-price', params);
   const data = unwrap(result);
-  if (result?.isError) throw new Error(JSON.stringify(data).slice(0, 300));
 
-  // 成功：掩码后落盘 + 人话摘要（首次成功请把字段结构补进 references/fields.md）
+  // 闸①（缺陷 B）：业务失败放在响应体里（success:false + code），result.isError 恒为 false。
+  // 任何走麦当劳 MCP 的代码都不得只靠 isError 判成败。
+  const bizFail = data?.success === false || (data?.code != null && Number(data.code) !== 200);
+  if (result?.isError || bizFail) throw new Error(`${data?.code ?? 'ERR'} ${data?.message ?? ''}`.trim());
+
+  // 闸②（缺陷 A 防呆）：带券请求必须验证 discount > 0 —— 券生效的唯一可靠信号。
+  // 不带券/漏券码是合法输入，服务端会静默返回 200 + discount:0 + 无券价，不得当到手价播报。
+  const price = Number(data?.data?.price);
+  const orig = Number(data?.data?.productOriginalPrice ?? data?.data?.originalPrice);
+  const disc = Number(data?.data?.discount);
+
+  // 闸②（缺陷 A 防呆）：本工具永远带双码，discount 必须 > 0 才算"券生效"。
+  const couponApplied = params.items.some((it) => it.couponCode);
+  if (couponApplied && !(disc > 0)) throw new Error('DISCOUNT_ZERO 券未生效，服务端返回的是无券价，不得作为到手价播报');
+
+  // 闸③（§5.2 基线自证）：同一次连发"无券 + 带券"两枪，断言无券价 ≥ 带券价且差值 == discount。
+  // 不一致 = 数据自相矛盾（静默降级被自动发现），先不播金额。
+  const baseParams = JSON.parse(JSON.stringify(params));
+  for (const it of baseParams.items) { delete it.couponId; delete it.couponCode; }
+  const baseData = unwrap(await client.callTool('calculate-price', baseParams));
+  const basePrice = Number(baseData?.data?.price);
+  if (!(basePrice >= price) || Math.abs((basePrice - price) - disc) > 1) {
+    throw new Error(`数据自相矛盾：无券价 ¥${(basePrice / 100).toFixed(1)} vs 带券价 ¥${(price / 100).toFixed(1)}，discount ¥${(disc / 100).toFixed(1)} —— 先不播金额`);
+  }
+
+  // 成功：掩码后落盘 + 到手价播报
   const slug = `${store}-${mask(coupon.id).replace(/•/g, '')}`;
   mkdirSync(join(ROOT, 'out'), { recursive: true });
   writeFileSync(join(ROOT, 'out', `quote.${slug}.json`), JSON.stringify(deepMask(data), null, 2));
-  console.log(`✓ 到手价已算出（券 ${mask(coupon.code)}），明细存 out/quote.${slug}.json（couponCode 已掩码）`);
-  console.log(JSON.stringify(deepMask(data), null, 2).slice(0, 1200));
-  console.log('· 首次成功取证：请把响应字段结构补进 references/fields.md');
+  console.log(`✓ 到手 ¥${(price / 100).toFixed(1)}（原价 ¥${(orig / 100).toFixed(1)}，券已生效，省 ¥${(disc / 100).toFixed(1)}），明细存 out/quote.${slug}.json（couponCode 已掩码）`);
 } catch (e) {
-  // 失败回退：按菜单现价估算（D4/§5.2 第 5 条）
+  // 失败：业务码翻译成人话（不打印 ✓），再走"菜单现价估算"回退
+  const raw = String(e.message ?? e).replace(/MCD[0-9A-Z]{8,}/g, (s) => mask(s));
+  const HUMAN = {
+    '600010': '这张券的核销凭证不完整（couponId/couponCode 需成对），是调用侧漏传',
+    '600012': '这张券不能用在指定商品上',
+    DISCOUNT_ZERO: '券没生效——服务端返回的是无券价，不能当到手价',
+  };
+  const key = Object.keys(HUMAN).find((k) => raw.startsWith(k)) ?? (raw.match(/\b(6000\d\d)\b/) ?? [])[1];
+  console.log(`⚠ ${key && HUMAN[key] ? HUMAN[key] + `（服务端 ${key.split(' ')[0]}）` : raw.slice(0, 200)}`);
+
+  // 回退估算：按菜单现价 − 券价（缺陷 A 存在时，这是唯一可信的估计，必须标注"以 App 结算为准"）
   const sc = read(`out/store-coupons.${store}.json`);
   const entry = (sc?.data ?? []).find((x) => x.couponId === coupon.id);
   const meals = read('out/query-meals.json');
@@ -164,8 +196,6 @@ try {
       if (m?.currentPrice) est = Math.max(est ?? 0, Number(m.currentPrice));
     }
   }
-  const short = String(e.message ?? e).replace(/MCD[0-9A-Z]{8,}/g, (s) => mask(s)).slice(0, 200);
-  console.log(`⚠ 服务端拒了（${short}）`);
   if (est != null && coupon.discountInfo?.discountValue) {
     const gain = (est - Number(coupon.discountInfo.discountValue)).toFixed(1);
     console.log(`按菜单现价估：现价 ¥${est} − 券价 ¥${coupon.discountInfo.discountValue} = 省 ¥${gain}，最终以麦当劳 App 结算为准。`);
