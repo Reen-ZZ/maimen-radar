@@ -303,7 +303,7 @@ export function buildModel({ couponsRaw, accountRaw, mealsRaw, storeCouponsRaw, 
           };
         })
         : null,
-      storeWindow: storeWin && !storeWin.outOfRange ? `这家店 ${hhmm(storeWin.from)}-${hhmm(storeWin.to)} 能刷` : null,
+      storeWindow: storeWin && !storeWin.outOfRange ? `这家店 ${hhmm(storeWin.from)}-${storeWin.to >= 1440 ? '23:59' : hhmm(storeWin.to)} 能刷` : null,
       raw: share ? null : c,
     };
   });

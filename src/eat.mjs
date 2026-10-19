@@ -1,0 +1,113 @@
+#!/usr/bin/env node
+/**
+ * 「今天吃啥」可执行入口（写死链路，docs/plans/2026-10-19-eat-this.md §4）。
+ *
+ *   node src/eat.mjs                      # 默认：收藏第一家 + 到店自取
+ *   node src/eat.mjs --store 1420370      # 指定门店
+ *   node src/eat.mjs --be 2               # 外送场景（需 out/ 有对应 orderType=2 的数据）
+ *   node src/eat.mjs --json               # 输出 top1 结构（含官方 image，供编排/卡片用）
+ *
+ * 唯一产出路径：对话里说「今天吃啥」先跑本脚本，再按输出纪律复述，不许模型临场挑券。
+ * 本脚本在任何路径下都不调算价通道（D4：只问不做，点头后才走 tools/quote.mjs）。
+ */
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { load, sourceDir } from './data.mjs';
+import { buildModel, pickTop1 } from './model.mjs';
+import { load as loadState } from './state.mjs';
+import { withCloser } from './tone.mjs';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const argv = process.argv.slice(2);
+const asJson = argv.includes('--json');
+const storeArg = (() => { const i = argv.indexOf('--store'); return i >= 0 ? argv[i + 1] : null; })();
+const beArg = (() => { const i = argv.indexOf('--be'); return i >= 0 ? Number(argv[i + 1]) : null; })();
+
+const SRC = sourceDir();
+if (!SRC) {
+  console.error('✗ 没有可用数据。先拉：node tools/probe-mcp.mjs query-my-coupons');
+  process.exit(1);
+}
+const read = (f) => { try { return load(f); } catch { return null; } };
+
+const state = loadState(ROOT);
+const sceneBeType = beArg ?? state.sceneBeType ?? 1;
+const storesRaw = read('query-nearby-stores.json');
+const pick = storeArg
+  ? (storesRaw?.data ?? []).find((s) => String(s.storeCode) === String(storeArg)) ?? null
+  : (storesRaw?.data?.[0] ?? null);
+const storeCouponsRaw = pick ? read(`store-coupons.${pick.storeCode}.json`) : null;
+const couponsRaw = read('query-my-coupons.json');
+const mealsRaw = read('query-meals.json');
+const accountRaw = read('query-my-account.json') ?? { data: {} };
+
+// 内部提示走 stderr，不进用户可见文本
+if (!couponsRaw) console.error('✗ 缺 query-my-coupons.json —— node tools/probe-mcp.mjs query-my-coupons');
+if (!mealsRaw) console.error('✗ 缺 query-meals.json —— node tools/probe-mcp.mjs query-meals --args \'{...}\'');
+if (pick && !storeCouponsRaw) {
+  console.error(`✗ 缺 store-coupons.${pick.storeCode}.json —— node tools/probe-mcp.mjs query-store-coupons --args '{"storeCode":"${pick.storeCode}","beType":1,"orderType":1}'`);
+}
+
+const model = buildModel({
+  couponsRaw: couponsRaw ?? { data: {} },
+  accountRaw,
+  mealsRaw: mealsRaw ?? { data: {} },
+  storeCouponsRaw,
+  store: pick ? { code: pick.storeCode, name: pick.storeName } : null,
+  sceneBeType,
+});
+const top = pickTop1(model);
+
+if (asJson) {
+  console.log(JSON.stringify({
+    ...top,
+    sceneBeType,
+    store: pick ? { code: pick.storeCode, name: pick.storeName } : null,
+    generatedAt: model.nowText,
+    dataSource: SRC,
+  }, null, 2));
+  process.exit(0);
+}
+
+// ── 用户可见文本：正文 → （引导）→ 收尾语，≤5 行 ──
+const L = [];
+let closerKind = 'silent';
+
+if (!pick) {
+  L.push('🍔 还没确定门店，先说「绑店」或给我一个门店名/城市。');
+} else if (top.fallback === 'no_store_coupons') {
+  L.push('🍔 还没拿到这家店此刻的放行名单，先按券面推断：');
+  const guess = model.coupons.find((c) => c.state === 'now');
+  if (guess) L.push(`   最可能是 ${guess.title}${guess.couponPrice ? `（用券 ¥${guess.couponPrice}）` : ''}，未确认到店能不能刷出来`);
+  L.push('   说「绑店」或让我拉一次这家店的可用券，我再给准话。');
+} else if (top.fallback === 'no_now') {
+  L.push('🍔 今天这家店一张都刷不出来。');
+  const gift = model.coupons.find((c) => c.state === 'gift');
+  if (gift) L.push(`   ${gift.title} 快到期且支持转赠——用不上就在麦当劳 App 里送人。`);
+  else L.push('   说「权益账单」看看每张券为什么不行。');
+} else if (top.fallback === 'no_price') {
+  // D2/D4：join 失败出局，只问一句，不自动算价
+  L.push(`🍔 现在有 ${top.outcast.length} 张能刷，但都是多选组合、菜单里没标价：`);
+  L.push(`   ${top.outcast.join('、')}`);
+  L.push('   要我先算到手价再说？');
+} else {
+  const t = top.top1;
+  const price = t.product?.sale != null
+    ? `菜单现价 ¥${t.product.sale}，用券 ¥${t.coupon.couponPrice} —— 省 ¥${t.gain.toFixed(1)}`
+    : `用券 ¥${t.coupon.couponPrice}`;
+  L.push(`🍔 现在最划得来：${t.coupon.title}`);
+  L.push(`   ${price}${t.verdict === 'marginal' ? '（别为它专门跑一趟）' : ''}`);
+  L.push(`   ${t.windowsNote ?? '以门店实际为准'}，今天余 ${t.coupon.quota} 次`);
+  if (top.second && top.second.gain != null && top.second.gain !== t.gain) {
+    L.push(`   其次：${top.second.coupon.title}（少省 ¥${(t.gain - top.second.gain).toFixed(1)}）`);
+  }
+  if (top.outcast.length) {
+    L.push(`   另外：${top.outcast[0]} 现在能刷，但菜单没标价——要我先算到手价再说？`);
+  }
+  closerKind = t.verdict === 'ok' || t.verdict === 'great' ? 'saved' : 'neutral';
+}
+
+if (SRC !== 'out') L.push(`（样例数据 · fixtures 快照）`);
+
+console.log(L.slice(0, 5).join('\n'));
+if (L.length && closerKind !== 'silent') console.log('\n' + withCloser('', closerKind).trim());

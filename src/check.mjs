@@ -10,7 +10,7 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { load, sourceDir } from './data.mjs';
-import { buildModel } from './model.mjs';
+import { buildModel, pickTop1 } from './model.mjs';
 
 const DIR = sourceDir();
 if (!DIR) { console.error('✗ 没有 out/ 或 fixtures/'); process.exit(1); }
@@ -37,6 +37,7 @@ for (const f of storeFiles) {
   const meta = (stores.data ?? []).find((s) => String(s.storeCode) === code);
 
   const model = buildModel({ couponsRaw: own, accountRaw, mealsRaw: meals, sceneBeType: 1,
+    storeCouponsRaw: load(f),
     store: meta ? { code, name: meta.storeName } : { code, name: '(未知门店)' } });
 
   // 主口径：key（券包 id）vs couponId。两者同源性未经真实调用交叉验证（fixtures 里
@@ -60,6 +61,16 @@ for (const f of storeFiles) {
   if (onlyMineTitles.length) console.log(`    模型多判（官方滤掉了，我们说能用）: ${onlyMineTitles.join(', ')}`);
   if (onlyTheirsTitles.length) console.log(`    模型漏判（官方说能用，我们说不能）: ${onlyTheirsTitles.join(', ')}`);
   if (!ok) fail++;
+
+  // C5：top1 必须 ∈ 官方放行集合（docs/plans/2026-10-19-eat-this.md §8.1）
+  const top = pickTop1(model);
+  if (top.top1) {
+    const inSet = theirKeys.has(top.top1.coupon.key);
+    console.log(`  ${inSet ? '✓' : '✗'} top1 ∈ 官方放行集合：${top.top1.coupon.title}（省 ¥${top.top1.gain?.toFixed(1)}）`);
+    if (!inSet) fail++;
+  } else if (keySpaceShared) {
+    console.log(`  · top1 未产出（${top.fallback}${top.fallback === 'no_price' ? '：' + (top.outcast ?? []).join('、') : ''}）`);
+  }
 }
 
 const p = accountRaw.data;
