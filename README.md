@@ -54,11 +54,15 @@
 → 今天别指望：11.9元麦辣鸡腿堡、19.9元王牌炸鸡任选2
 ```
 
-**传播面**——同一份数据渲染出的小票版卡片，560px 自包含 HTML，无外部依赖，浏览器打开即可截图转发：
+**传播面**——同一份数据渲染出的小票版卡片，560px 自包含 HTML，无外部依赖，浏览器打开即可截图转发。在 WorkBuddy 里说「生成卡片」就行：
 
-```
-生成卡片    ← 在 WorkBuddy 里说这三个字就行
-```
+<p align="center">
+  <img src="assets/card.png" width="300" alt="完整版卡片（含门店名与积分绝对值）"/>
+  &nbsp;
+  <img src="assets/card.share.png" width="300" alt="分享版卡片（已脱敏）"/>
+</p>
+
+> 上图为**样例数据**（2026-10-18 实测快照），左为完整版、右为分享版。分享版在模型层脱敏：门店名 → "一家麦当劳餐厅"，券名 → 品类，积分只留百分比。
 
 ## 它最诚实的一点
 
@@ -108,6 +112,8 @@ git clone https://github.com/Reen-ZZ/maimen-radar.git && cp -r maimen-radar ~/.w
 | `权益账单` | 券包全景：哪张现在能用、哪张为什么不行、积分作废了多少 |
 | `今天吃啥` | 推荐此刻真能刷出来的那张 + 为什么是它 |
 | `生成卡片` | 脱敏分享版小票卡片，可直接转发 |
+
+> 「生成卡片」想出**你实时账户**的卡，需要技能目录里有 `.env`（Token），让 skill 先拉真实数据；没配时出的是样例数据卡片，skill 会如实标注，不会冒充实时。
 
 ## 第一次用会发生什么
 
@@ -165,6 +171,28 @@ node tools/probe-mcp.mjs query-my-coupons   # 拉真实券包到 out/（已 giti
 ```
 
 > **两条 Token 通道，互不相干**：`.env` 只喂给上面这些项目脚本；WorkBuddy 连接器用的是第 2 步里你自己粘的那份配置。两边各配各的，一边配了另一边不会自动生效。
+
+### 生成卡片（截图转发）
+
+在**技能目录**（`SKILL.md` 所在目录）内执行。skill 会按 A → B → C 的顺序自己走，并如实告知数据来源：
+
+```bash
+# A. 已有真实数据（out/ 里已有响应）——直接出卡
+node src/demo.mjs --share              # 分享版 → dist/demo.share.html
+node src/demo.mjs --store 9000002      # --store 指定门店，默认取收藏第一家
+
+# B. 没有真实数据：把 Token 填进技能目录根的 .env（模板 .env.example），先拉再出
+node tools/probe-mcp.mjs query-my-coupons
+node tools/probe-mcp.mjs query-my-account
+node tools/probe-mcp.mjs query-nearby-stores
+node tools/probe-mcp.mjs query-meals
+node src/demo.mjs --share
+
+# C. 都没有：退回 fixtures/ 样例，产出会标注快照日期
+node src/demo.mjs --share
+```
+
+产物 `dist/*.html` 用浏览器打开截图即可。**这条链路在 `SKILL.md`「输出形状」里已写死**，对话里说「生成卡片」时 skill 按同一顺序执行，不会临场发挥。
 
 ### 技术要点
 

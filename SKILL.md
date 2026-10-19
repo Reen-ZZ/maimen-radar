@@ -109,6 +109,13 @@ description: 麦门雷达 —— 麦当劳权益的「可用窗口」雷达。�
 
 分享版脱敏在**模型层**做（`share:true`），不在渲染层做——否则文本版会漏。脱敏后渲染器拿不到原始券名、门店名、积分绝对值、`raw` 字段。
 
+**生成卡片的链路（写死，别临场发挥）**——在技能目录（SKILL.md 所在目录）内按序尝试：
+
+1. `out/query-my-coupons.json` 存在 → 直接 `node src/demo.mjs --share`（`--store <code>` 可指定门店）。
+2. 没有 `out/` 但技能目录有 `.env` → 先逐个 `node tools/probe-mcp.mjs <tool>`（`query-my-coupons` / `query-my-account` / `query-nearby-stores` / `query-meals`）落进 `out/`，再跑 demo。
+3. 两样都没有 → 直接跑 demo（自动退回 `fixtures/` 样例），并**明示"样例数据卡片（快照日期见 fixtures）"**，不得冒充实时。
+4. 产出 `dist/demo.share.html`。对话里只给文件路径 + 一句说明（遵守输出纪律）。**绝不手写 HTML 卡片，绝不把原始 MCP JSON 直接喂渲染器**——渲染只走脚本一条路。
+
 ## 麦门语气
 
 `src/tone.mjs`。重复是梗的生命，但用错场合就是欠揍，所以收尾语按情境分档：

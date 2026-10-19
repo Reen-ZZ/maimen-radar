@@ -27,12 +27,23 @@ const mealsRaw = read('query-meals.json');
 const storesRaw = read('query-nearby-stores.json');
 
 const share = process.argv.includes('--share');
+// --store <code>：指定门店（默认取收藏列表第一家）
+const storeArg = (() => {
+  const i = process.argv.indexOf('--store');
+  return i >= 0 ? process.argv[i + 1] : null;
+})();
+const stores = storesRaw?.data ?? [];
+const pick = storeArg ? stores.find((s) => String(s.storeCode) === String(storeArg)) : stores[0];
+if (storeArg && !pick) {
+  console.error(`✗ 没有门店 ${storeArg}。可用：${stores.map((s) => s.storeCode + ' ' + s.storeName).join(' / ')}`);
+  process.exit(1);
+}
 
 const model = buildModel({
   couponsRaw,
   accountRaw: accountRaw ?? { data: {} },
   mealsRaw: mealsRaw ?? { data: {} },
-  store: storesRaw?.data?.[0] ? { code: storesRaw.data[0].storeCode, name: storesRaw.data[0].storeName } : null,
+  store: pick ? { code: pick.storeCode, name: pick.storeName } : null,
   share,
 });
 
