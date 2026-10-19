@@ -110,7 +110,7 @@ git clone https://github.com/Reen-ZZ/maimen-radar.git && cp -r maimen-radar ~/.w
 | 你说 | 它给 |
 |---|---|
 | `权益账单` | 券包全景：哪张现在能用、哪张为什么不行、积分作废了多少 |
-| `今天吃啥` | 推荐此刻真能刷出来的那张 + 为什么是它 |
+| `今天吃啥` | 推荐此刻真能刷出来、到手最划算的那一张 + 为什么是它 |
 | `生成卡片` | 脱敏分享版小票卡片，可直接转发 |
 
 > 「生成卡片」想出**你实时账户**的卡，需要技能目录里有 `.env`（Token），让 skill 先拉真实数据；没配时出的是样例数据卡片，skill 会如实标注，不会冒充实时。
@@ -161,6 +161,7 @@ node src/demo.mjs              # 出上面的权益账单
 node src/demo.mjs --share      # 脱敏分享版卡片 → dist/
 node src/check.mjs             # 断言：模型判定与官方过滤是否一致
 node src/wake.mjs              # 唤醒四步：补算播报 → 四态 → 账单 → 写回 state
+node src/eat.mjs               # 「今天吃啥」：官方放行集合里真实增益最大的那一张
 node src/preflight.mjs         # 提交前自检：必备文件、密钥泄漏、断链
 ```
 

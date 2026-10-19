@@ -104,6 +104,17 @@ $ node src/check.mjs
 | 服务端 35 个 Tool，官方 README 列 33 个；`query-survey-coupon`、`query-promotions` 未写入文档；`query-partystore-*` 实际已改名为 `query-party-store-*` | 照 README 硬编码工具名会调不到，运行时以 `tools/list` 为准 |
 | 积分账户三向闭合：`used + expired + available == accumulative` | 不闭合即数据异常，先报错不计算比例 |
 
+## 6.1 追加取证（2026-10-19，共 13 次只读调用）
+
+| 事实 | 取值 | 影响 |
+|---|---|---|
+| `weekdays` 映射修正 | `1=周日 … 7=周六`（周一判别性证据） | 模型已修，`check.mjs` 真数据 3/3 通过 |
+| id 同源 | 券包 `id` == 门店券 `couponId`（3/3 逐字节） | A2 认亲路径成立 |
+| join 断链 | `9900016534`（任选组合）不在菜单字典与引用里 | 该类券不显示"省"，只给问话 |
+| 券侧名 ≠ 菜单名 | "麦咖啡™冰美式中杯" vs "麦咖啡™美式" | join 走 `productCode`，阶梯用菜单侧真名 |
+| `frequent` 锚点 | `data.frequent = {code:"9900013304", tags:["我的常点"]}` | 排序破平局项（fields.md 已记） |
+| `calculate-price` 600010 | 只给 `couponId` 被拒，需 `couponId+couponCode` 双码 | 算价脚本不得回显入参；成功结构待取证 |
+
 ## 6. 业务价值
 
 **麦当劳的接口会静默滤掉用户用不了的券，并且不说明原因。** 本次实测直接证明了这一点：券包 4 张，`query-store-coupons` 只返回 1 张，另外 3 张分别因星期窗、`enable`、`beTypes` 不匹配被滤除，接口返回里没有任何"为什么"。

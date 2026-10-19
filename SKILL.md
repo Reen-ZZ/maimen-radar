@@ -102,8 +102,8 @@ description: 麦门雷达 —— 麦当劳权益的「可用窗口」雷达。�
 
 | 用户说的是 | 调用链 | 给什么 |
 |---|---|---|
-| 今天吃啥 / 推荐 | 唤醒四步 → `query-store-coupons` → `query-meals` | 现在能用的 top1 + 为什么是它 |
-| 这张券划算吗 | `query-store-coupons` 取 `products[].productCode` → join `query-meals` → `couponLadder()` | 原价/现价/券价 + **真实增益**，见下 |
+| 今天吃啥 / 推荐 | 唤醒四步 → `node src/eat.mjs`（写死，见「今天吃啥」节） | 官方放行集合里真实增益最大的那一张 + 到手价 + 这家店的可刷时段 |
+| 这张券划算吗 | `query-store-coupons` 取 `products[].productCode` → join `query-meals` → `couponLadder()` | 原价/现价/券价 + **真实增益**（与「今天吃啥」共用同一函数，不另设口径），见下 |
 | 为什么用不了 | 四态 `reasons` + `beTypes` 差集 | 人话原因 + 换场景能否救 + 转赠出路 |
 | 积分能换啥 | `query-my-account` + `mall-points-products` | 按 元值/积分 性价比选锚点做具象化 |
 | 替我领取优惠券 | `available-coupons` 报数 → 等用户回「领」 → `auto-bind-coupons` → 再查一次做 diff | 新增哪几张、哪几张大概用不上 |
@@ -114,6 +114,17 @@ description: 麦门雷达 —— 麦当劳权益的「可用窗口」雷达。�
 **券的真实增益**是本 skill 的招牌诚实：`原价 − 券价` 是营销数字，`菜单现价 − 券价` 才是用户真省到的。两者都报，差得多就直说"别为它专门跑一趟"。
 
 **`available-coupons` 报 -32602 ＝ 无券可领。** 内部按"无券可领"处理：不重试、不说"服务异常"。对外只回两句——结论 + 一条出路，**不复述错误码、字段或成因**（详见 references/fields.md）。
+
+## 今天吃啥（写死流程，别自主发挥）
+
+唯一产出路径：`node src/eat.mjs`（`--store <code>` 指定门店 / `--be 2` 外送 / `--json` 给编排）。对话里说「今天吃啥」先跑脚本，再按输出纪律复述，**不许自己挑券**。六步：
+
+1. **定场景**：读 `state` 的 `stores[0]` 与 `sceneBeType`；用户说"外送/得来速"才切换，切换需要 `beCode`。
+2. **取候选**：`store-coupons.<code>.json` 缺失时先 `node tools/probe-mcp.mjs query-store-coupons --args ...`（只读，可自动执行，无需确认）。
+3. **算增益**：脚本内 `couponLadder` 统一口径；join 失败（任选组合类 SKU 不在菜单）的券出局，只占一句"要我算到手价吗"。
+4. **排序**：真实增益降序 → 今日余量升序 → 到期升序 → 「我的常点」（官方 `frequent` 锚点）仅破三键全平。
+5. **答题**：≤5 行——结论 + 菜单现价/券价/省多少 + 这家店的可刷时段 + 一条"其次"；**正文不贴任何图片链接**；不出现字段名/工具名。
+6. **出路**：0 张放行 → 转赠或「权益账单」；全部无价 → **只问一句"要我算到手价吗"并停下**，用户点头后才走 `tools/quote.mjs`（到手价需 `couponId+couponCode` 双码，脚本绝不回显入参、券码掩码落盘）；`eat.mjs` 自身一律不调算价。
 
 ## 绑店 / 换店（写死流程，别自主发挥）
 
