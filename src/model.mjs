@@ -13,6 +13,23 @@ function isoWeekday(d) {
   return d.getDay() + 1;
 }
 
+/** 门店侧时间窗：store-coupons 的 tradeDateTime（"2026-10-19 10:30:00-2026-10-23 23:59:59"）
+ *  是"这家店今天几点起能刷"的权威口径，冲突时优先于券包 tradeTimePeriods。 */
+function parseStoreWindow(s, now) {
+  const m = String(s ?? '').match(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})-(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})$/);
+  if (!m) return null;
+  const start = parseServerTime(`${m[1]} ${m[2]}`);
+  const end = parseServerTime(`${m[3]} ${m[4]}`);
+  if (!start || !end) return null;
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
+  const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime();
+  if (today < startDay || today > endDay) return { outOfRange: true, start, end };
+  const from = startDay === today ? start.getHours() * 60 + start.getMinutes() : 0;
+  const to = endDay === today ? Math.max(from, end.getHours() * 60 + end.getMinutes()) : 1440;
+  return { outOfRange: false, from, to, start, end };
+}
+
 function parseServerTime(s) {
   if (!s) return null;
   const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
@@ -116,13 +133,8 @@ function parseStart(c) {
   return m ? parseServerTime(`${m[1]} ${m[2]}:${m[3]}:00`) : null;
 }
 
-function classify(coupon, now, sceneBeType = 1) {
+function classify(coupon, now, sceneBeType = 1, storeWin = null) {
   const reasons = [];
-  const wd = isoWeekday(now);
-  const weekdays = Array.isArray(coupon.weekdays) ? coupon.weekdays.map(Number) : [];
-  const dayOk = !weekdays.length || weekdays.includes(wd);
-  if (!dayOk) reasons.push(`限${weekdayRange(weekdays)}可用，今天${['周日', '周一', '周二', '周三', '周四', '周五', '周六'][wd - 1]}不行`);
-
   const beTypes = Array.isArray(coupon.beTypes) ? coupon.beTypes.map(Number) : [];
   const sceneOk = !beTypes.length || beTypes.includes(Number(sceneBeType));
   if (!sceneOk) {
@@ -136,27 +148,53 @@ function classify(coupon, now, sceneBeType = 1) {
   const quota = Number(coupon.currentDayAvailableCount ?? 1);
   if (quota <= 0) reasons.push('今日次数已用完');
 
-  const startAt = parseStart(coupon);
-  const notStarted = startAt !== null && now < startAt;
-  if (notStarted) {
-    const hm = startAt.getHours() || startAt.getMinutes()
-      ? ` ${String(startAt.getHours()).padStart(2, '0')}:${String(startAt.getMinutes()).padStart(2, '0')}` : '';
-    reasons.push(`${startAt.getMonth() + 1}月${startAt.getDate()}日${hm} 生效，还没到`);
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  let wins = [], inWin = false, future = null, blocked = null, notStarted = false;
+  let startAt = null;
+
+  if (storeWin) {
+    // 门店侧时间窗优先：有官方窗口就不再查券包 weekdays / periods
+    if (storeWin.outOfRange) {
+      blocked = now < storeWin.start
+        ? `${storeWin.start.getMonth() + 1}月${storeWin.start.getDate()}日起这家店能刷`
+        : '这家店的可用期已过';
+    } else {
+      wins = [{ from: storeWin.from, to: storeWin.to }];
+      if (nowMin < storeWin.from) {
+        future = { from: storeWin.from, to: storeWin.to };
+        reasons.push(`这家店 ${hhmm(storeWin.from)} 起能刷`);
+      } else if (nowMin >= storeWin.to) {
+        blocked = '这家店今天的可刷时段已过';
+      } else {
+        inWin = true;
+      }
+    }
+  } else {
+    const wd = isoWeekday(now);
+    const weekdays = Array.isArray(coupon.weekdays) ? coupon.weekdays.map(Number) : [];
+    const dayOk = !weekdays.length || weekdays.includes(wd);
+    if (!dayOk) reasons.push(`限${weekdayRange(weekdays)}可用，今天${['周日', '周一', '周二', '周三', '周四', '周五', '周六'][wd - 1]}不行`);
+
+    startAt = parseStart(coupon);
+    notStarted = startAt !== null && now < startAt;
+    if (notStarted) {
+      const hm = startAt.getHours() || startAt.getMinutes()
+        ? ` ${String(startAt.getHours()).padStart(2, '0')}:${String(startAt.getMinutes()).padStart(2, '0')}` : '';
+      reasons.push(`${startAt.getMonth() + 1}月${startAt.getDate()}日${hm} 生效，还没到`);
+    }
+
+    wins = windowsToday(coupon, now);
+    inWin = wins.some((w) => nowMin >= w.from && nowMin < w.to);
+    future = wins.filter((w) => nowMin < w.from).sort((a, b) => a.from - b.from)[0] ?? null;
   }
 
-  const nowMin = now.getHours() * 60 + now.getMinutes();
-  const wins = windowsToday(coupon, now);
-  const inWin = wins.some((w) => nowMin >= w.from && nowMin < w.to);
-  const future = wins.filter((w) => nowMin < w.from).sort((a, b) => a.from - b.from)[0];
-
+  const blockedByRule = !sceneOk || !enabled || quota <= 0;
   let state;
-  if (notStarted) state = startAt.toDateString() === now.toDateString() ? 'later' : 'locked';
-  else if (!dayOk) state = 'locked';
-  else if (!sceneOk) state = 'locked';
-  else if (!enabled) state = 'locked';
-  else if (quota <= 0) state = 'locked';
-  else if (inWin) state = 'now';
-  else if (future) state = 'later';
+  if (blocked) state = 'locked';
+  // 券包侧生效起始（仅无门店窗口时生效）：今天晚些生效 → later，未来某天 → locked
+  else if (!storeWin && notStarted) state = startAt.toDateString() === now.toDateString() ? 'later' : 'locked';
+  else if (inWin) state = blockedByRule ? 'locked' : 'now';
+  else if (future) state = blockedByRule ? 'locked' : 'later';
   else state = 'locked';
 
   if (state === 'locked' && Number(coupon.isCanGive) === 1) {
@@ -167,7 +205,7 @@ function classify(coupon, now, sceneBeType = 1) {
 
   const label = { now: '现在能用', later: '今天晚些能用', locked: '今天用不了', gift: '用不上就送人' }[state];
   const glyph = { now: '🟢', later: '🟠', locked: '🔴', gift: '🟡' }[state];
-  return { state, label, glyph, reasons, wins, dayOk, inWin, nextWindow: future ?? null };
+  return { state, label, glyph, reasons, wins, inWin, nextWindow: future ?? null };
 }
 
 function hoursLeftText(endAt, now) {
@@ -186,16 +224,54 @@ export function buildModel({ couponsRaw, accountRaw, mealsRaw, storeCouponsRaw, 
       ? '券包当前为空（服务端 code:499，稳定语义非故障）'
       : `券包接口返回异常 code:${couponsRaw?.code ?? '?'}，以下结果不可信`)
     : '';
+  // 菜单归并索引（券/商品 join 与价格阶梯的唯一来源）——先建索引，后面认亲与增益都靠它
+  const mealIndex = new Map();
+  for (const [code, e] of Object.entries(mealsRaw?.data?.meals ?? {})) {
+    const key = e.name;
+    const cur = mealIndex.get(key) ?? { name: key, tiers: {} };
+    if (Number(e.originalPrice) > 0) {
+      cur.tiers.list = Math.max(cur.tiers.list ?? 0, Number(e.originalPrice));
+      cur.tiers.sale = cur.tiers.sale == null ? Number(e.currentPrice) : Math.min(cur.tiers.sale, Number(e.currentPrice));
+    }
+    mealIndex.set(key, cur);
+  }
+  for (const cat of mealsRaw?.data?.categories ?? []) {
+    for (const ref of cat.meals ?? []) {
+      const e = mealsRaw.data.meals[ref.code];
+      if (!e) continue;
+      const rec = mealIndex.get(e.name);
+      if (!rec) continue;
+      // 新品只认 "上新" 这一个精确 tag——"新升级""清爽上新"等营销 tag 语义不纯，不猜
+      if ((ref.tags ?? []).includes('上新')) rec.isNew = true;
+      if ((ref.tags ?? []).includes('麦金卡')) rec.tiers.gold = Number(e.currentPrice);
+    }
+  }
+  // 官方个性化锚点：data.frequent = {code, tags:["我的常点"]}（fields.md 已记录）
+  const frequent = mealsRaw?.data?.frequent
+    ? (() => {
+      const e = mealsRaw.data.meals[mealsRaw.data.frequent.code];
+      return e ? { code: mealsRaw.data.frequent.code, name: e.name } : null;
+    })()
+    : null;
+
+  // 官方放行集合索引：couponId → 门店券条目（认亲、门店侧时间窗、商品 join 都靠它）
+  const officialCoupons = new Map(Array.isArray(storeCouponsRaw?.data)
+    ? storeCouponsRaw.data.map((x) => [x.couponId, x])
+    : []);
+
   const coupons = (couponsRaw?.data?.coupons ?? []).map((c) => {
-    const cls = classify(c, now, sceneBeType);
+    const realTitle = c.title ?? '(未命名券)';
+    const key = c.id ?? c.code ?? realTitle;
+    const off = officialCoupons.get(key) ?? null;
+    const storeWin = off ? parseStoreWindow(off.tradeDateTime, now) : null;
+    const cls = classify(c, now, sceneBeType, storeWin);
     const endAt = parseServerTime(c.tradeEndDateTime);
     const di = c.discountInfo ?? {};
-    const realTitle = c.title ?? '(未命名券)';
     return {
       title: realTitle,
       displayTitle: share ? categorize(realTitle) : realTitle,
       // 内部稳定键：id 是哈希，不可核销，可安全用于跨轮 diff；绝不渲染给用户
-      key: c.id ?? c.code ?? realTitle,
+      key,
       codeMasked: maskCode(c.code),
       endAt,
       endText: c.tradeEndDateTime ?? c.tradeEndDate ?? '',
@@ -211,6 +287,21 @@ export function buildModel({ couponsRaw, accountRaw, mealsRaw, storeCouponsRaw, 
       dueTodayTag: (c.tags ?? []).some((t) => t?.value === 'due today'),
       channelNote: c.toastText ?? '',
       receivedDays: c.receivedDays ?? null,
+      // 认亲结果：官方门店券的商品 join（inMenu = 菜单里有现价，可算增益）
+      matchedProducts: off
+        ? (off.products ?? []).map((p) => {
+          const e = mealsRaw?.data?.meals?.[p.productCode];
+          const rec = e ? mealIndex.get(e.name) : null;
+          return {
+            productCode: p.productCode,
+            productName: p.productName ?? e?.name ?? '',
+            sale: rec?.tiers?.sale ?? null,
+            image: e?.image ?? null,
+            inMenu: rec?.tiers?.sale != null,
+          };
+        })
+        : null,
+      storeWindow: storeWin && !storeWin.outOfRange ? `这家店 ${hhmm(storeWin.from)}-${hhmm(storeWin.to)} 能刷` : null,
       raw: share ? null : c,
     };
   });
@@ -233,50 +324,30 @@ export function buildModel({ couponsRaw, accountRaw, mealsRaw, storeCouponsRaw, 
     heldPct: accum ? (num(p.availablePoint) / accum) * 100 : 0,
   };
 
-  const mealIndex = new Map();
-  for (const [code, e] of Object.entries(mealsRaw?.data?.meals ?? {})) {
-    const key = e.name;
-    const cur = mealIndex.get(key) ?? { name: key, tiers: {} };
-    if (Number(e.originalPrice) > 0) {
-      cur.tiers.list = Math.max(cur.tiers.list ?? 0, Number(e.originalPrice));
-      cur.tiers.sale = cur.tiers.sale == null ? Number(e.currentPrice) : Math.min(cur.tiers.sale, Number(e.currentPrice));
-    }
-    mealIndex.set(key, cur);
-  }
-  for (const cat of mealsRaw?.data?.categories ?? []) {
-    for (const ref of cat.meals ?? []) {
-      const e = mealsRaw.data.meals[ref.code];
-      if (!e) continue;
-      const rec = mealIndex.get(e.name);
-      if (!rec) continue;
-      // 新品只认 "上新" 这一个精确 tag——"新升级""清爽上新"等营销 tag 语义不纯，不猜
-      if ((ref.tags ?? []).includes('上新')) rec.isNew = true;
-      if ((ref.tags ?? []).includes('麦金卡')) rec.tiers.gold = Number(e.currentPrice);
-    }
-  }
-
   const counts = coupons.reduce((a, c) => ((a[c.state] = (a[c.state] ?? 0) + 1), a), {});
   const nowMin = now.getHours() * 60 + now.getMinutes();
 
-  // 券价叠加：门店可用券按官方 couponId（= 券包 id，2026-10-19 实测同源）认亲，
-  // products[].productCode join 菜单得现价，真实增益 = 现价 − 券价。
-  // 无门店券数据时整段跳过，账单退化为不显示增益。
-  if (Array.isArray(storeCouponsRaw?.data)) {
-    const official = new Map(storeCouponsRaw.data.map((x) => [x.couponId, x]));
-    for (const c of coupons) {
-      const off = official.get(c.key);
-      if (!off || c.couponPrice == null) continue;
-      let sale = null;
-      for (const p of off.products ?? []) {
-        const e = mealsRaw?.data?.meals?.[p.productCode];
-        const rec = e ? mealIndex.get(e.name) : null;
-        const s = rec?.tiers?.sale;
-        if (s != null) sale = sale == null ? s : Math.min(sale, s);
-      }
-      if (sale == null) continue;
-      const gain = +(sale - c.couponPrice).toFixed(1);
-      c.realGain = gain;
-      c.verdict = gain <= 0 ? 'worthless' : gain < 3 ? 'marginal' : gain < 10 ? 'ok' : 'great';
+  // 增益统一走 couponLadder（"今天吃啥"与"这张券划算吗"同一口径）：
+  // 对认亲成功且 join 成功的券，取最优商品回写 realGain / verdict / ladderProduct。
+  // join 全失败（任选组合类 SKU 不在菜单）→ 不写增益，由 pickTop1 出局并给问话。
+  for (const c of coupons) {
+    if (!c.matchedProducts?.length || c.couponPrice == null) continue;
+    let best = null;
+    for (const mp of c.matchedProducts) {
+      if (!mp.inMenu) continue;
+      const lad = couponLadder({ meals: [...mealIndex.values()] }, mp.productName, c.couponPrice);
+      if (lad.realGain == null) continue;
+      if (!best || lad.realGain > best.lad.realGain) best = { mp, lad };
+    }
+    if (best) {
+      c.realGain = best.lad.realGain;
+      c.verdict = best.lad.verdict;
+      c.ladderProduct = {
+        code: best.mp.productCode,
+        name: best.mp.productName,
+        sale: best.lad.sale,
+        image: best.mp.image,
+      };
     }
   }
 
@@ -302,7 +373,9 @@ export function buildModel({ couponsRaw, accountRaw, mealsRaw, storeCouponsRaw, 
     coupons,
     counts,
     points,
-    meals: [...mealIndex.values()].filter((m) => m.tiers.list),
+    meals: [...mealIndex.values()].filter((m) => m.tiers.list != null || m.tiers.sale != null),
+    frequent,
+    storeCouponIds: [...officialCoupons.keys()],
     trace: share
       ? { couponTraceId: '', accountTraceId: '', serverDatetime: '' }
       : {
@@ -314,8 +387,8 @@ export function buildModel({ couponsRaw, accountRaw, mealsRaw, storeCouponsRaw, 
 }
 
 /**
- * 券的真实增益 = 菜单现价 − 券价。
- * 很多券看着"原价 19 → 券价 9.9"很香，但菜单现价已经 11.9，券其实只多省 2 块。
+ * 券的真实增益 = 菜单现价 − 券价（"今天吃啥"与"这张券划算吗"共用的唯一口径）。
+ * gold（麦金卡价）只作展示档，不参与 verdict 判定——实测 gold === sale，无价差可叙。
  */
 export function couponLadder(model, productName, couponPrice) {
   const rec = model.meals.find((x) => x.name === productName);
@@ -348,3 +421,47 @@ export function parseYuan(...strs) {
 }
 
 export { TRACK, BLOCKS };
+
+/**
+ * 「今天吃啥」的 top1 选择器（写死，回复里不许另挑）。
+ * 候选池 = 官方放行集合 ∩ 模型判 now（docs/plans/2026-10-19-eat-this.md §3.1）。
+ * 排序（D1/D3）：realGain 降序 → 今日余量升序 → 到期升序 → frequent「我的常点」仅破三键全平。
+ * fallback：'no_store_coupons' 无门店券数据 / 'no_now' 放行了但没判出 now / 'no_price' 全部 join 失败。
+ */
+export function pickTop1(model) {
+  const inOfficial = new Set(model.storeCouponIds ?? []);
+  const hasStore = inOfficial.size > 0;
+  const pool = model.coupons.filter((c) => c.state === 'now' && inOfficial.has(c.key));
+  if (!pool.length) return { top1: null, second: null, outcast: [], fallback: hasStore ? 'no_now' : 'no_store_coupons' };
+
+  const comparable = pool.filter((c) => c.realGain != null);
+  if (!comparable.length) return { top1: null, second: null, outcast: pool.map((c) => c.title), fallback: 'no_price' };
+
+  const rank = (c) => ({
+    c,
+    hitsFrequent: !!model.frequent && (c.matchedProducts ?? []).some((mp) => mp.productCode === model.frequent.code),
+  });
+  const cmp = (a, b) => {
+    if (b.c.realGain !== a.c.realGain) return b.c.realGain - a.c.realGain;        // 主键：增益降序
+    if ((a.c.quota ?? 99) !== (b.c.quota ?? 99)) return (a.c.quota ?? 99) - (b.c.quota ?? 99); // 次键：余量升序
+    const ea = a.c.endAt?.getTime() ?? Infinity, eb = b.c.endAt?.getTime() ?? Infinity;
+    if (ea !== eb) return ea - eb;                                               // 三键：到期升序
+    return (b.hitsFrequent ? 1 : 0) - (a.hitsFrequent ? 1 : 0);                  // 四键：常点破平局
+  };
+  const sorted = comparable.map(rank).sort(cmp);
+  const mk = ({ c, hitsFrequent }) => ({
+    coupon: c,
+    product: c.ladderProduct ?? null,
+    gain: c.realGain,
+    verdict: c.verdict ?? null,
+    windowsNote: c.storeWindow ?? null,
+    hitsFrequent,
+  });
+  return {
+    top1: mk(sorted[0]),
+    second: sorted[1] ? mk(sorted[1]) : null,
+    outcast: pool.filter((c) => c.realGain == null).map((c) => c.title),
+    fallback: null,
+  };
+}
+

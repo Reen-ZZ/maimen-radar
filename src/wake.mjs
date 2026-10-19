@@ -36,6 +36,7 @@ const mealsRaw = read('query-meals.json') ?? { data: {} };
 const storesRaw = read('query-nearby-stores.json');
 
 // ── 1+2+3. 补算 → 四态 → 答题 ──
+const prev = loadState(ROOT); // 先读 state：sceneBeType 要回读，不能被默认值覆盖
 const pick = storesRaw?.data?.[0] ?? null;
 const storeCouponsRaw = pick ? read(`store-coupons.${pick.storeCode}.json`) : null;
 const model = buildModel({
@@ -44,10 +45,10 @@ const model = buildModel({
   mealsRaw,
   storeCouponsRaw,
   store: pick ? { code: pick.storeCode, name: pick.storeName } : null,
+  sceneBeType: prev.sceneBeType ?? 1,
 });
 
 // ── 4. 写回 state（diff 要先算，写回会覆盖 prev）──
-const prev = loadState(ROOT);
 const d = diff(prev, model);
 save(ROOT, snapshot(prev, model));
 
