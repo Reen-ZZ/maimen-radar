@@ -115,7 +115,7 @@ for (const doc of ['README.md', 'MCP_INTEGRATION.md', 'SKILL.md']) {
 }
 
 console.log('\n【6】命令与离线可用性（README 承诺的每条命令）');
-for (const f of ['tools/probe-mcp.mjs', 'tools/make-fixtures.mjs', 'src/check.mjs', 'src/demo.mjs', 'src/wake.mjs', 'src/eat.mjs', 'src/data.mjs', 'src/state.mjs', 'src/preflight.mjs']) {
+for (const f of ['tools/probe-mcp.mjs', 'tools/make-fixtures.mjs', 'tools/quote.mjs', 'src/check.mjs', 'src/demo.mjs', 'src/wake.mjs', 'src/eat.mjs', 'src/data.mjs', 'src/state.mjs', 'src/preflight.mjs']) {
   existsSync(join(ROOT, f)) ? ok(`node ${f}`) : bad(`README 承诺的 ${f} 不存在`);
 }
 // 刚 clone 的人没有 out/，必须靠 fixtures/ 跑通

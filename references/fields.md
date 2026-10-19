@@ -16,9 +16,9 @@
 ## 到手价需双码
 
 - `calculate-price` 只给 `couponId` 会被拒：`600010 使用优惠券需要couponId和couponCode`。
-- `items[]` 支持 `couponId/couponCode/productCode/quantity/roundList/modification/withOrder`。
+- `items[]` 支持 `couponId/couponCode/productCode/quantity/roundList/modification/withOrder`，**双码按 item 挂**。
 - **因此任何算价脚本不得回显入参**（券码可核销），结果落盘前必须把 `couponCode` 掩码。
-- `couponId+couponCode` 同时给之后的成功响应结构**尚未取证**，第一次真实算价成功后补进本文件。
+- ✅ **2026-10-19 首次成功取证**（traceId `add1f944…`，冰美式券+双码）：响应 `data.{productOriginalPrice, productPrice, originalPrice, discount, price, productList[]}`，**单位是分**（`price: 990` = ¥9.9）。到手价 ¥9.9 == 券价 → 与"现价−券价"的估算（省 ¥2.0）交叉吻合。不带双码时服务端不报错、只返回无券价格（productPrice=现价）——**静默陷阱：算价必须核对手里有没有带券**。
 
 ## 券侧商品名 ≠ 菜单侧实体名
 
