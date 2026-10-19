@@ -32,6 +32,9 @@ const BANTER = {
   all_good: '券的状态比你的日程表还规矩。',
   empty: '券包空空，等于没白拿。',
   points_burn: '积分这东西，放着放着就熟了，熟了就没。',
+  // 用户亲自批的两条句式：产品名双关 + 表态，只表态、不索取
+  full_score: '在麦当劳你永远可以拿满分（指麦满分）。',
+  golden_year: '祝你今年金拱门。',
 };
 export const banter = (key) => BANTER[key] ?? '';
 
