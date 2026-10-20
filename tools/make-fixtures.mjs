@@ -64,11 +64,12 @@ const remapStores = (data) => JSON.parse(JSON.stringify(data).replace(/1420721|1
   j.traceId = hex('query-nearby-stores');
   write('query-nearby-stores.json', j);
 }
-// 4. 菜单（纯公开目录，只换 traceId）
-{
-  const j = read('query-meals.json');
-  j.traceId = hex('query-meals');
-  write('query-meals.json', j);
+// 4. 门店级菜单：每家一份，文件名带 storeCode（响应里不自报门店，来源只能写在名字上）
+for (const f of readdirSync(OUT).filter((x) => x.startsWith('meals.'))) {
+  const j = read(f);
+  j.traceId = hex(f);
+  const old = f.match(/^meals\.(\d+)\.json$/)[1];
+  write(`meals.${STORE_MAP[old] ?? old}.json`, j);
 }
 // 5. 两家门店的可用券
 for (const f of readdirSync(OUT).filter((x) => x.startsWith('store-coupons.'))) {

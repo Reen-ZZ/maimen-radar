@@ -204,7 +204,9 @@ try {
   }
 
   // BUG-10 修正：比现价的口径按全部 items 的菜单现价 × 各自数量 合计算，不再只取 items[0]、不漏乘数量
-  const meals = read('out/query-meals.json');
+  const meals = read(`out/meals.${store}.json`);
+  if (!meals) console.error(`[quote] 门店 ${store} 没有菜单快照，菜单现价无从核对 —— `
+    + `node tools/probe-mcp.mjs query-meals --args '{"storeCode":"${store}","beType":1,"orderType":1}'`);
   const menuFen = params.items.reduce((sum, it) => {
     const m = meals?.data?.meals?.[it.productCode];
     return m?.currentPrice != null ? sum + Math.round(Number(m.currentPrice) * 100) * Number(it.quantity ?? 1) : sum;
@@ -230,7 +232,8 @@ try {
   // 回退估算（BUG-6/10 修正）：多件按需求**求和 × 各自数量**；单位统一为分，只在显示时除 100
   const sc = read(`out/store-coupons.${store}.json`);
   const entry = (sc?.data ?? []).find((x) => x.couponId === coupon.id);
-  const meals = read('out/query-meals.json');
+  const meals = read(`out/meals.${store}.json`);
+  if (!meals) console.error(`[quote] 门店 ${store} 没有菜单快照，回退估算缺少现价基准`);
   const wanted = items.length ? items : (entry?.products ?? []).map((p) => ({ productCode: p.productCode, quantity: 1 }));
   let estFen = null;
   for (const it of wanted) {

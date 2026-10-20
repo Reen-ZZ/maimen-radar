@@ -21,6 +21,16 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_DIR = join(ROOT, 'out');
 const PROBE_VERSION = '2025-06-18';
 
+/**
+ * 门店级工具的落盘文件名 —— 必须带 storeCode。
+ * 这些响应的内容按门店变（实测两店菜单 17 个价差 / 20 个店独占单品），
+ * 但响应体里不自报门店，所以门店来源只能写在文件名里。无 key 落盘等于把来源丢掉。
+ */
+const SCOPED_OUTPUT = {
+  'query-meals': (code) => `meals.${code}`,
+  'query-store-coupons': (code) => `store-coupons.${code}`,
+};
+
 function loadToken() {
   if (process.env.MCD_MCP_TOKEN) return process.env.MCD_MCP_TOKEN;
   const envFile = join(ROOT, '.env');
@@ -250,9 +260,16 @@ async function main() {
   const result = await client.callTool(toolName, toolArgs);
   const data = unwrapToolResult(result);
 
-  const outFile = join(OUT_DIR, `${toolName}.json`);
+  // 门店级响应按 storeCode 键落盘。`query-meals` 的响应里**没有任何门店身份字段**
+  // （顶层只有 success/code/message/datetime/traceId/data），门店来源只存在于请求参数里——
+  // 不写进文件名就等于丢掉，于是 A 店的券能配上 B 店的价目表。
+  const scoped = SCOPED_OUTPUT[toolName] && toolArgs?.storeCode
+    ? SCOPED_OUTPUT[toolName](String(toolArgs.storeCode))
+    : null;
+  const outFile = join(OUT_DIR, `${scoped ?? toolName}.json`);
   writeFileSync(outFile, JSON.stringify(data, null, 2));
-  console.log(`✓ 原始响应已存 ${outFile.replace(ROOT + '/', '')}`);
+  console.log(`✓ 原始响应已存 ${outFile.replace(ROOT + '/', '')}`
+    + (scoped ? `（门店级，按 storeCode=${toolArgs.storeCode} 键）` : ''));
 
   if (result?.isError) console.log('⚠ 服务端标记 isError=true，内容：\n' + JSON.stringify(data).slice(0, 800));
 

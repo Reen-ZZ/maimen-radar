@@ -32,7 +32,7 @@ description: 麦门雷达 —— 麦当劳（金拱门 / McDonald's / mcdonalds 
 | 1 | 领券发现无券可领 | 说「权益账单」看看手里现有的券 |
 | 2 | 本月有将过期积分（账单出现"⚠ 本月将过期"） | 说「积分能换啥」看看这些分能换什么 |
 | 3 | 账单里有现在能用的券 | 说「今天吃啥」看此刻那张怎么用 |
-| 4 | 冷启动缺门店 | 说「绑店」（见冷启动引导） |
+| 4 | 既没绑定门店、也没有收藏可采（`resolveStore` 返回 null） | 说「绑店」（见冷启动引导） |
 | 5 | 其它任何回答完 | 说「生成卡片」出分享版 |
 
 活动日历不进引导表：唤醒四步不拉它，用户问「最近有啥活动」才答。
@@ -52,7 +52,9 @@ description: 麦门雷达 —— 麦当劳（金拱门 / McDonald's / mcdonalds 
 先 `query-nearby-stores(searchType=1)` 读收藏——**有收藏就直接采用，不让用户选**：
 
 - 采用规则：`state` 里上次用过的那家优先；无历史则取收藏列表第一家。写进 `state` 并起别名。
+  这条规则现在由 `src/store.mjs` 的 `resolveStore()` 执行，落盘由 `wake.mjs` 第四步的 `snapshot()` 自动折入——**不再要求模型手改 JSON**。以前没有代码落点，`stores` 永远是空、`needStore` 永远为真，催绑那句每轮都占一行且永远闭不了嘴。
 - 回复里**必须一句明示用的是哪家**（"按你收藏的 XX 店判的"），并留一句"换店说一声"。静默选店比问一句更危险——选错门店会让结论全错而用户不知情。
+  判据是 `src/store.mjs` 的 `needsAnnounce()`，看的是这家店**有没有被用户确认过**（`resolveStore` 返回的 `origin`），不是本轮怎么取到它的。自动采用的店落盘后仍是"未确认"，不许在第二轮升格成"按你绑定的"——那等于系统替用户做了他没做过的决定。
 - 用户中途点了别的店 → 立刻切换覆盖，不追问、不啰嗦。
 
 **无收藏**才开口问一次（给城市或门店名）；本轮先给账户级结论，并标注"未绑店，以下为券包字段推断，未经门店过滤确认"。
@@ -118,10 +120,10 @@ description: 麦门雷达 —— 麦当劳（金拱门 / McDonald's / mcdonalds 
 
 ## 今天吃啥（写死流程，别自主发挥）
 
-唯一产出路径：`node src/eat.mjs`（`--store <code>` 指定门店 / `--json` 给编排）。对话里说「今天吃啥」先跑脚本，再按输出纪律复述，**不许自己挑券**。六步：
+唯一产出路径：`node src/eat.mjs`（`--store <编码|别名>` 临时指定门店 / `--json` 给编排）。对话里说「今天吃啥」先跑脚本，再按输出纪律复述，**不许自己挑券**。六步：
 
-1. **定场景**：读 `state` 的 `stores[0]`。**本技能只判到店场景（beType=1）**——外送、得来速、下单不在范围内，用户要外送或点餐就引导去麦当劳 App。
-2. **取候选**：`store-coupons.<code>.json` 缺失时先 `node tools/probe-mcp.mjs query-store-coupons --args ...`（只读，可自动执行，无需确认）。
+1. **定场景**：门店走 `resolveStore({state, arg, favorites})`，优先级＝显式 `--store`（编码或别名）> `state` 默认店 > 收藏第一家；解析结果带 `source`，采用收藏店时必须一句明示。**本技能只判到店场景（beType=1）**——外送、得来速、下单不在范围内，用户要外送或点餐就引导去麦当劳 App。
+2. **取候选**：菜单与门店券**都按 storeCode 取**（`out/meals.<code>.json` + `out/store-coupons.<code>.json`，缺哪个先 `node tools/probe-mcp.mjs <tool> --args '{"storeCode":"<code>",...}'`，只读可自动执行）。缺这家店的菜单就**不算钱**——`query-meals` 响应里不自报门店，拿别家价目表算这家券，错的是钱不是图（实测两店 17 个价差 / 20 个店独占单品）。
 3. **算增益**：脚本内 `couponLadder` 统一口径；join 失败（任选组合类 SKU 不在菜单）的券出局，只占一句"要我算到手价吗"。
 4. **排序**：真实增益降序 → 今日余量升序 → 到期升序 → 「我的常点」（官方 `frequent` 锚点）仅破三键全平。
 5. **答题**：≤5 行——结论 + 菜单现价/券价/省多少 + 这家店的可刷时段 + 一条"其次"；**正文不贴任何图片链接**；不出现字段名/工具名。
@@ -135,7 +137,7 @@ description: 麦门雷达 —— 麦当劳（金拱门 / McDonald's / mcdonalds 
 2. **查询**：`query-nearby-stores(searchType=2, city, keyword)`；用户说"我收藏那家"时用 `searchType=1` 读收藏对照。
 3. **匹配**：名称含关键词的唯一命中 → 直接作候选；多个命中 → 按名称相似度列前 3 个（店名 + 地址）让用户选；零命中 → 复述一次理解，请用户补地标或换说法。**不猜、不编门店。**
 4. **确认**：候选念给用户——"是这家吗：麦当劳深圳龙胜地铁站D出口餐厅（XX 路）"——**得到确认才算绑定**。唯一命中也走这步：绑错店的代价大于多问一句。
-5. **落盘**：写 `state/maimen-radar.json` 的 `stores` 字段（`{alias, code, name, city}`，与 `src/state.mjs` 一致），回复一句"绑好了，以后按这家算"。
+5. **落盘**：调 `src/store.mjs` 的 `bindStore(state, {code, name, address}, {alias, city})` 写进 `state/maimen-radar.json` 的 `stores`（`{alias, code, name, city}`，与 `src/state.mjs` 一致），回复一句"绑好了，以后按这家算"。**别手改 JSON**——手改的那条路没有代码校验，也是以前 `stores` 一直为空的成因。`city` 只在用户说过城市时才写：接口不返回城市（实测），从店名里正则反推是猜。**只有走完第 4 步拿到确认才调它**——`bindStore` 默认记 `source: 'user'`，这是唯一允许以后静默沿用这家店的凭据。
 6. **换店** = 同流程覆盖旧记录。绑定完成后 `needStore` 自然消失，可按引导优先级表顺势给「今天吃啥」。
 
 ## 输出形状
@@ -161,10 +163,10 @@ description: 麦门雷达 —— 麦当劳（金拱门 / McDonald's / mcdonalds 
 **生成卡片的链路（写死，别临场发挥）**——在技能目录（SKILL.md 所在目录）内按序尝试：
 
 1. `out/query-my-coupons.json` 存在 → 直接 `node src/demo.mjs --share`（`--store <code>` 可指定门店）；要出**发群用的传播版**则 `node src/demo.mjs --propagate`。
-2. 没有 `out/` 但技能目录有 `.env` → 先逐个 `node tools/probe-mcp.mjs <tool>`（`query-my-coupons` / `query-my-account` / `query-nearby-stores` / `query-meals`）落进 `out/`，再跑 demo。
+2. 没有 `out/` 但技能目录有 `.env` → 先逐个 `node tools/probe-mcp.mjs <tool>`（`query-my-coupons` / `query-my-account` / `query-nearby-stores --args '{"searchType":1,"beType":1}'` / `query-meals --args '{"storeCode":"<code>","beType":1,"orderType":1}'`）落进 `out/`，再跑 demo。门店级工具按 storeCode 键落盘（`out/meals.<code>.json`），别手改文件名。
 3. 两样都没有 → 直接跑 demo（自动退回 `fixtures/` 样例），并**明示"样例数据卡片（快照日期见 fixtures）"**，不得冒充实时。
 4. 产出 `dist/demo.share.html`（账单分享版）或 `dist/propagate.html`（传播版）。对话里只给文件路径 + 一句说明（遵守输出纪律）。**绝不手写 HTML 卡片，绝不把原始 MCP JSON 直接喂渲染器**——渲染只走脚本一条路。
-5. 出卡片前必须两个闸门都过：`node src/check.mjs`（判定与官方一致）+ `node src/check-share.mjs`（脱敏与取图口径）。任一不过，不许交付。
+5. 出卡片前必须三个闸门都过：`node src/check.mjs`（判定与官方一致）+ `node src/check-share.mjs`（脱敏与取图口径）+ `node src/check-store.mjs`（门店由绑定决定、菜单与门店同源）。任一不过，不许交付。
 
 ## 麦门语气（硬规则）
 

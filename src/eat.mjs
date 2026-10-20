@@ -2,9 +2,12 @@
 /**
  * 「今天吃啥」可执行入口（写死链路，docs/plans/2026-10-19-eat-this.md §4）。
  *
- *   node src/eat.mjs                      # 默认：收藏第一家 + 到店自取
- *   node src/eat.mjs --store 1420370      # 指定门店
+ *   node src/eat.mjs                      # 默认：绑定的那家店 + 到店自取
+ *   node src/eat.mjs --store 1420370      # 指定门店（编码或别名，如 --store 家）
  *   node src/eat.mjs --json               # 输出 top1 结构（含官方 image，供编排/卡片用）
+ *
+ * 门店来源收敛在 src/store.mjs 的 resolveStore：显式指定 > 绑定的默认店 > 官方收藏第一家。
+ * 本脚本只读 state，不写——落盘由 wake.mjs 的第四步负责。
  *
  * 核心设计：只判到店场景（beType=1）。外送、得来速、下单不在范围内——引导去麦当劳 App。
  *
@@ -13,8 +16,9 @@
  */
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { load, sourceDir } from './data.mjs';
+import { load, loadScoped, sourceDir } from './data.mjs';
 import { buildModel, pickTop1 } from './model.mjs';
+import { resolveStore, needsAnnounce, storeAnnounce } from './store.mjs';
 import { load as loadState } from './state.mjs';
 import { withCloser } from './tone.mjs';
 
@@ -33,20 +37,25 @@ if (!SRC) {
 const read = (f) => { try { return load(f); } catch { return null; } };
 
 const state = loadState(ROOT);
-const storesRaw = read('query-nearby-stores.json');
-const pick = storeArg
-  ? (storesRaw?.data ?? []).find((s) => String(s.storeCode) === String(storeArg)) ?? null
-  : (storesRaw?.data?.[0] ?? null);
-const storeCouponsRaw = pick ? read(`store-coupons.${pick.storeCode}.json`) : null;
+const favorites = read('query-nearby-stores.json')?.data ?? [];
+const store = resolveStore({ state, arg: storeArg, favorites });
+const storeCouponsRaw = store ? read(`store-coupons.${store.code}.json`) : null;
 const couponsRaw = read('query-my-coupons.json');
-const mealsRaw = read('query-meals.json');
 const accountRaw = read('query-my-account.json') ?? { data: {} };
+
+// 菜单是门店级响应（query-meals 必传 storeCode），响应里又不自报门店 ——
+// 缺这家店的快照就不算钱，绝不拿别家店的价目表凑（错的是钱，不是图）
+let mealsRaw = null;
+let menuGap = null;
+if (store) {
+  try { mealsRaw = loadScoped('meals', store.code); } catch (e) { menuGap = e.message; }
+}
 
 // 内部提示走 stderr，不进用户可见文本
 if (!couponsRaw) console.error('✗ 缺 query-my-coupons.json —— node tools/probe-mcp.mjs query-my-coupons');
-if (!mealsRaw) console.error('✗ 缺 query-meals.json —— node tools/probe-mcp.mjs query-meals --args \'{...}\'');
-if (pick && !storeCouponsRaw) {
-  console.error(`✗ 缺 store-coupons.${pick.storeCode}.json —— node tools/probe-mcp.mjs query-store-coupons --args '{"storeCode":"${pick.storeCode}","beType":1,"orderType":1}'`);
+if (store && !mealsRaw) console.error(`✗ ${menuGap}`);
+if (store && !storeCouponsRaw) {
+  console.error(`✗ 缺 store-coupons.${store.code}.json —— node tools/probe-mcp.mjs query-store-coupons --args '{"storeCode":"${store.code}","beType":1,"orderType":1}'`);
 }
 
 const model = buildModel({
@@ -54,7 +63,7 @@ const model = buildModel({
   accountRaw,
   mealsRaw: mealsRaw ?? { data: {} },
   storeCouponsRaw,
-  store: pick ? { code: pick.storeCode, name: pick.storeName } : null,
+  store,
   sceneBeType,
 });
 const top = pickTop1(model);
@@ -63,7 +72,7 @@ if (asJson) {
   console.log(JSON.stringify({
     ...top,
     sceneBeType,
-    store: pick ? { code: pick.storeCode, name: pick.storeName } : null,
+    store: store ? { code: store.code, name: store.name, source: store.source } : null,
     generatedAt: model.nowText,
     dataSource: SRC,
   }, null, 2));
@@ -74,8 +83,11 @@ if (asJson) {
 const L = [];
 let closerKind = 'silent';
 
-if (!pick) {
+if (!store) {
   L.push('🍔 还没确定门店，先说「绑店」或给我一个门店名/城市。');
+} else if (menuGap) {
+  L.push(`🍔 店是 ${store.name ?? store.code}，但这家店的菜单快照还没有，到手价和省额先不算。`);
+  L.push('   说一句「拉一下这家店」就行（只读接口，不用确认）。');
 } else if (top.fallback === 'no_store_coupons') {
   L.push('🍔 还没拿到这家店此刻的放行名单，先按券面推断：');
   const guess = model.coupons.find((c) => c.state === 'now');
@@ -108,6 +120,8 @@ if (!pick) {
   closerKind = t.verdict === 'ok' || t.verdict === 'great' ? 'saved' : 'neutral';
 }
 
+// 用户没确认过的店必须明示是哪家（SKILL.md:55）——插在第 2 行，不会被 5 行上限截掉
+if (needsAnnounce(store)) L.splice(1, 0, `   ${storeAnnounce(store)}`);
 if (SRC !== 'out') L.push(`（样例数据 · fixtures 快照）`);
 
 console.log(L.slice(0, 5).join('\n'));

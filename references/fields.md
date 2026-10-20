@@ -1,6 +1,8 @@
 # 字段实测笔记
 
-全部来自 `mcd-mcp v1.0.0` 真实响应（2026-10-18 抓取）。仓库内发布的是脱敏样例 `fixtures/`——业务事实（餐品、价格、时段窗、星期窗、积分口径）真实，身份字段（券码、券 id、accountId、门店名与编码、traceId）已替换。凭直觉解析这些字段一定会错，所以写解析前先过一遍。
+全部来自 `mcd-mcp v1.0.0` 真实响应。仓库内发布的是脱敏样例 `fixtures/`——业务事实（餐品、价格、时段窗、星期窗、积分口径）真实，身份字段（券码、券 id、accountId、门店名与编码、traceId）已替换。凭直觉解析这些字段一定会错，所以写解析前先过一遍。
+
+> 样例快照日期：券包/积分/门店券 **2026-10-18**；菜单 `meals.<code>.json` **2026-10-20**（改造成按 storeCode 键存时只能从当前 `out/` 重新生成，其余文件留在 10-18 那次快照上，所以两份日期不同——菜单是公开目录，跨这两天没变出口径）。
 
 ## 门店侧时间窗优先
 
@@ -94,6 +96,22 @@
 - `data.frequent = {code, tags:["我的常点"]}` 是官方个性化锚点（实测指向"人气经典随心配"），可直接用作默认偏好，但**只作排序破平局项，不作加分**。
 - **麦金卡价差别当会员演算**：实测某店 15 条 `麦金卡` tag 引用的商品名下 **0 条存在同名第二条 SKU**（`gold === sale`）。💳 段展示的"麦金卡"列与现价同值时，不得当作会员价差叙述。
 - 入参规则：`beType=1 → orderType=1` 不传 `beCode`；`beType=5 → orderType=1` 必传 `beCode`；`beType=2/6 → orderType=2` 必传 `beCode`。
+
+## 菜单是门店级响应，却不自报门店（✅ 2026-10-20 实测，据此改的落盘规则）
+
+- `query-meals` 的 required = `["storeCode","orderType","beType"]`，但响应顶层只有 `success/code/message/datetime/traceId/data`，`data` 里也只有 `categories/meals/frequent` —— **没有任何门店身份字段**。门店来源只存在于请求参数里，落盘即丢失。
+- 所以**文件名就是唯一的来源记录**：`out/meals.<storeCode>.json`（`store-coupons.<code>.json` 早就是这个约定，菜单漏了）。`src/data.mjs` 的 `loadScoped()` 只认带 key 的文件、**拒绝回退**，缺这家店的快照就报错并点名门店。
+- 两店菜单实测差集（同一账号，2026-10-20）：共同且同价 85 / **价差 17** / **仅一家有 20**。而券的放行集合两家相同 —— 意味着 `check.mjs` 那种"只比集合不比价"的闸门**抓不到这种错配**，故另立 `src/check-store.mjs`。
+- 教训：`storeCode` 进了入参就必须进文件名。否则 A 店的券会拿着 B 店的价目表算"省多少"，而错的是钱，不是图。
+
+## 收藏门店（`query-nearby-stores`，✅ 2026-10-20 真实账号实测）
+
+- 必传 `beType` 与 `searchType`（`1`=收藏餐厅，默认；`2`=按 `city`+`keyword` 位置搜索）。**不传参数直接没有 `data`**。
+- 每条返回 `storeCode / storeName / address / reservation / reservationTimeOptions[] / distance / longitude / latitude`。
+- **没有 `city` 字段**。城市只能从 `storeName`/`address` 反推，那是猜——所以 `state.stores[].city` 只在用户自己说过城市时才写。
+- **`searchType=1` 下 `distance`、`longitude`、`latitude` 全是 0** ⇒ 拿不到就近信息，"按距离自动选店"这条路接口不支持。
+- `reservationTimeOptions[].reservationOptionText` 给的是**这家店当天**的分段时段（如"午餐(10:44至14:15)，下午茶(14:44至16:45)，夜市…"），可直接用作绑定时报给用户的"几点能刷"。
+- 实测该账号收藏 **2 家、跨 2 个城市**（惠州博罗天虹 / 深圳龙胜地铁站）⇒ 多店是真实形状，不是假设。但同一天两家的放行集合与 top1 省额**完全一致**（0 差异），差异只存在于上面那 17/20 个菜单条目里，所以多店 UI 的收益**尚未被证实**。
 
 ## 门店券（`query-store-coupons`）
 

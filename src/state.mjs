@@ -6,6 +6,7 @@
  */
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { bindStore } from './store.mjs';
 
 const SCHEMA = 1;
 const EMPTY = { schema: SCHEMA, last_seen: null, stores: [], sceneBeType: 1, coupons: {}, points: {}, saved: { entries: 0, total: 0 }, menu: {} };
@@ -33,6 +34,23 @@ export function save(root, s) {
   return p;
 }
 
+/**
+ * 把本轮所判门店折进 state —— SKILL.md 冷启动第②步「写进 state 并起别名」的代码落点。
+ * 没有这一步，`stores` 永远为空、`needStore` 永远为真，催绑话术每轮都占一行且永远闭不了嘴。
+ *
+ * 只有 state 里还没有店时才占默认位：临时指定或收藏里换了一家，都只登记不抢位——
+ * 静默换店的后果是结论全错而用户不知情，这个代价比多问一句大。
+ */
+function foldStore(prev, model) {
+  const stores = prev?.stores ?? [];
+  if (!model?.store?.code) return stores;
+  return bindStore(prev, model.store, {
+    setDefault: stores.length === 0,
+    source: model.store.source ?? 'adopted',
+    lastUsed: model.trace?.serverDatetime || model.nowText || null,
+  }).stores;
+}
+
 /** 把当前 model 折成下一轮的快照 */
 export function snapshot(prev, model) {
   const coupons = {};
@@ -43,6 +61,7 @@ export function snapshot(prev, model) {
     ...prev,
     last_seen: model.trace.serverDatetime || model.nowText,
     sceneBeType: model.sceneBeType,
+    stores: foldStore(prev, model),
     coupons,
     menu,
     points: {

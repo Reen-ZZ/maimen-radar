@@ -115,12 +115,20 @@ for (const doc of ['README.md', 'MCP_INTEGRATION.md', 'SKILL.md']) {
 }
 
 console.log('\n【6】命令与离线可用性（README 承诺的每条命令）');
-for (const f of ['tools/probe-mcp.mjs', 'tools/make-fixtures.mjs', 'tools/quote.mjs', 'src/check.mjs', 'src/demo.mjs', 'src/wake.mjs', 'src/eat.mjs', 'src/data.mjs', 'src/state.mjs', 'src/preflight.mjs']) {
+for (const f of ['tools/probe-mcp.mjs', 'tools/make-fixtures.mjs', 'tools/quote.mjs', 'src/check.mjs', 'src/check-share.mjs', 'src/check-store.mjs', 'src/demo.mjs', 'src/wake.mjs', 'src/eat.mjs', 'src/data.mjs', 'src/state.mjs', 'src/store.mjs', 'src/preflight.mjs']) {
   existsSync(join(ROOT, f)) ? ok(`node ${f}`) : bad(`README 承诺的 ${f} 不存在`);
 }
 // 刚 clone 的人没有 out/，必须靠 fixtures/ 跑通
-for (const f of ['query-my-coupons.json', 'query-my-account.json', 'query-meals.json', 'query-nearby-stores.json']) {
+for (const f of ['query-my-coupons.json', 'query-my-account.json', 'query-nearby-stores.json']) {
   existsSync(join(ROOT, 'fixtures', f)) ? ok(`fixtures/${f}`) : bad(`缺 fixtures/${f}，clone 后 demo 与 check 会直接失败`);
+}
+// 菜单是门店级响应，按 code 键存：每家 store-coupons 都得配一份自己的 meals，
+// 否则 clone 后 check.mjs 会拿不到该店价目表（实测两店 17 个价差 / 20 个店独占单品）
+for (const f of readdirSync(join(ROOT, 'fixtures')).filter((x) => x.startsWith('store-coupons.'))) {
+  const code = f.match(/store-coupons\.(.+)\.json$/)[1];
+  existsSync(join(ROOT, 'fixtures', `meals.${code}.json`))
+    ? ok(`fixtures/meals.${code}.json`)
+    : bad(`缺 fixtures/meals.${code}.json —— 门店 ${code} 没有自己的菜单样例`);
 }
 if (!existsSync(join(ROOT, 'src', 'journey.mjs')) || readFileSync(join(ROOT, '.gitignore'), 'utf8').includes('src/journey.mjs')) {
   ok('src/journey.mjs 未入库（其产物属非公开设计文档）');

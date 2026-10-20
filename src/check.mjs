@@ -9,7 +9,7 @@
  */
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { load, sourceDir } from './data.mjs';
+import { load, loadScoped, sourceDir } from './data.mjs';
 import { buildModel, pickTop1 } from './model.mjs';
 
 const DIR = sourceDir();
@@ -17,7 +17,7 @@ if (!DIR) { console.error('✗ 没有 out/ 或 fixtures/'); process.exit(1); }
 
 const own = load('query-my-coupons.json');
 const accountRaw = load('query-my-account.json');
-const meals = load('query-meals.json');
+// 菜单不再全局取一份：它是门店级响应，每家店必须用**自己**的那份，否则算的是别家的价
 const stores = load('query-nearby-stores.json');
 const storeFiles = existsSync(DIR) ? readdirSync(DIR).filter((f) => f.startsWith('store-coupons.')) : [];
 
@@ -35,6 +35,14 @@ for (const f of storeFiles) {
   const code = f.match(/store-coupons\.(.+)\.json$/)[1];
   const official = load(f).data ?? [];
   const meta = (stores.data ?? []).find((s) => String(s.storeCode) === code);
+
+  // 菜单必须按店取：这一家没有自己的快照就判红，绝不退回手边别家的价目表
+  let meals;
+  try { meals = loadScoped('meals', code); } catch (e) {
+    console.log(`✗ ${code} 一致性无从判起 —— ${e.message}`);
+    fail++;
+    continue;
+  }
 
   const model = buildModel({ couponsRaw: own, accountRaw, mealsRaw: meals, sceneBeType: 1,
     storeCouponsRaw: load(f),

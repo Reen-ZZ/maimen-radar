@@ -2,14 +2,40 @@
   "success": true,
   "code": 200,
   "message": "请求成功",
-  "datetime": "2026-10-18 17:08:59",
+  "datetime": "2026-10-20 13:00:13",
   "traceId": "c081cee1dd3b392755befdc5468f36b8",
   "data": [
+    {
+      "title": "19.9元王牌炸鸡任选2",
+      "couponId": "761d3286699774997ab6e5cba24eb74d",
+      "couponCode": "FIXTURE-COUPON-761D3286",
+      "tradeDateTime": "2026-10-19 10:30:00-2026-10-23 23:59:59",
+      "products": [
+        {
+          "productCode": "9900016534",
+          "productName": "王牌炸鸡任选2"
+        }
+      ],
+      "promotionId": "112479004"
+    },
+    {
+      "title": "11.9元麦辣鸡腿堡",
+      "couponId": "b364e85f082090b288042f0d6a453da2",
+      "couponCode": "FIXTURE-COUPON-B364E85F",
+      "tradeDateTime": "2026-10-19 10:30:00-2026-10-23 23:59:59",
+      "products": [
+        {
+          "productCode": "1440",
+          "productName": "麦辣鸡腿汉堡"
+        }
+      ],
+      "promotionId": "112479003"
+    },
     {
       "title": "9.9元中杯冰美式",
       "couponId": "ee3e7af7fbed34fa2a95d99948781ec6",
       "couponCode": "FIXTURE-COUPON-EE3E7AF7",
-      "tradeDateTime": "2026-10-12 00:00:00-2026-10-18 23:59:59",
+      "tradeDateTime": "2026-10-19 00:00:00-2026-10-25 23:59:59",
       "products": [
         {
           "productCode": "507411",

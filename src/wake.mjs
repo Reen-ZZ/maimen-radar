@@ -14,9 +14,10 @@
  */
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { load, sourceDir } from './data.mjs';
+import { load, loadScoped, sourceDir } from './data.mjs';
 import { buildModel } from './model.mjs';
 import { renderText } from './render-text.mjs';
+import { resolveStore, needsAnnounce, storeAnnounce } from './store.mjs';
 import { load as loadState, save, snapshot, diff, wakeLines } from './state.mjs';
 import { withCloser, banter } from './tone.mjs';
 
@@ -32,19 +33,25 @@ const read = (f) => { try { return load(f); } catch { return null; } };
 
 const couponsRaw = load('query-my-coupons.json');
 const accountRaw = read('query-my-account.json') ?? { data: {} };
-const mealsRaw = read('query-meals.json') ?? { data: {} };
-const storesRaw = read('query-nearby-stores.json');
+const favorites = read('query-nearby-stores.json')?.data ?? [];
 
 // ── 1+2+3. 补算 → 四态 → 答题 ──
-const prev = loadState(ROOT); // 先读 state：sceneBeType 要回读，不能被默认值覆盖
-const pick = storesRaw?.data?.[0] ?? null;
-const storeCouponsRaw = pick ? read(`store-coupons.${pick.storeCode}.json`) : null;
+const prev = loadState(ROOT); // 先读 state：门店与 sceneBeType 都要回读，不能被默认值覆盖
+const store = resolveStore({ state: prev, favorites });
+// 菜单是门店级响应（query-meals 必须传 storeCode），缺这家店的快照就不算钱：
+// 拿别家店的价目表算这家的券，错的是钱，不是图
+let mealsRaw = { data: {} };
+let menuGap = null;
+if (store) {
+  try { mealsRaw = loadScoped('meals', store.code); } catch { menuGap = store.code; }
+}
+const storeCouponsRaw = store ? read(`store-coupons.${store.code}.json`) : null;
 const model = buildModel({
   couponsRaw,
   accountRaw,
   mealsRaw,
   storeCouponsRaw,
-  store: pick ? { code: pick.storeCode, name: pick.storeName } : null,
+  store,
   sceneBeType: 1, // 核心设计只判到店
 });
 
@@ -66,10 +73,18 @@ console.log(lines.join('\n'));
 console.log('');
 console.log(withCloser(renderText(model), kind));
 console.log('');
+if (menuGap) {
+  console.error(`✗ 门店 ${menuGap} 没有菜单快照，本轮不算到手价与省额 —— `
+    + `node tools/probe-mcp.mjs query-meals --args '{"storeCode":"${menuGap}","beType":1,"orderType":1}'`);
+}
+// 用户没确认过的店必须说一句是哪家（收藏自动采用也算）；确认绑定过的不重复声明
+if (needsAnnounce(store)) console.log(storeAnnounce(store));
 console.log(`state 已写回：${join('state', 'maimen-radar.json')}（last_seen = ${model.trace.serverDatetime || model.nowText}）`);
-if (d.needStore) {
+if (!store) {
   console.log('冷启动引导：第①步（账户级盘点）已完成，停在第②步补门店——'
     + 'query-nearby-stores(searchType=1) 读收藏，无则 searchType=2 按城市+关键词，仍无则明示降级口径。');
+} else if (d.needStore) {
+  console.log(`门店已落盘：${store.code}（${storeAnnounce(store)}），下一轮起不再催绑。`);
 } else {
   console.log('冷启动引导：已完成，常态唤醒（补算 → 四态 → 答题 → 写回）。');
 }

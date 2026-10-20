@@ -15,7 +15,8 @@
  *   分享版（账单）：券名仍收成品类名，防回归
  *   传播版（keepTitles）：券名保留真名，且必须拿得到图
  */
-import { load, sourceDir } from './data.mjs';
+import { load, loadScoped, sourceDir } from './data.mjs';
+import { resolveStore } from './store.mjs';
 import { buildModel } from './model.mjs';
 import { renderText } from './render-text.mjs';
 import { renderHTML } from './render-html.mjs';
@@ -26,12 +27,13 @@ if (!DIR) { console.error('✗ 没有 out/ 或 fixtures/'); process.exit(1); }
 
 const couponsRaw = load('query-my-coupons.json');
 const accountRaw = load('query-my-account.json');
-const mealsRaw = load('query-meals.json');
-const stores = load('query-nearby-stores.json')?.data ?? [];
-const pick = stores[0];
-const storeCouponsRaw = (() => { try { return load(`store-coupons.${pick.storeCode}.json`); } catch { return null; } })();
-const common = { couponsRaw, accountRaw, mealsRaw, storeCouponsRaw,
-  store: pick ? { code: pick.storeCode, name: pick.storeName } : null };
+const favorites = load('query-nearby-stores.json')?.data ?? [];
+// 闸门固定按收藏第一家判，不读本机 state —— 结果必须可重复，不能随用户绑了哪家而变
+const store = resolveStore({ favorites });
+// 菜单与门店必须同源：闸门自己也不能拿 A 店的菜单去判 B 店的卡
+const mealsRaw = loadScoped('meals', store.code);
+const storeCouponsRaw = (() => { try { return load(`store-coupons.${store.code}.json`); } catch { return null; } })();
+const common = { couponsRaw, accountRaw, mealsRaw, storeCouponsRaw, store };
 
 const share = buildModel({ ...common, share: true });
 const prop = buildModel({ ...common, share: true, keepTitles: true });
@@ -48,7 +50,7 @@ neverInRender.push(...neverInModel);
 for (const [f, v] of [['query-my-coupons', couponsRaw], ['query-my-account', accountRaw], ['query-meals', mealsRaw]]) {
   if (v?.traceId) neverInRender.push([`traceId.${f}`, String(v.traceId)]);
 }
-for (const s of stores) if (s.storeName) neverInRender.push(['门店真名', String(s.storeName)]);
+for (const s of favorites) if (s.storeName) neverInRender.push(['门店真名', String(s.storeName)]);
 for (const k of ['accumulativePoint', 'expiredPoint', 'usedPoint', 'availablePoint']) {
   const v = String(accountRaw?.data?.[k] ?? '');
   if (v.length >= 4) neverInRender.push([`积分.${k}`, v]);

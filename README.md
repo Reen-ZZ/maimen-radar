@@ -217,6 +217,7 @@ node src/demo.mjs --share      # 脱敏分享版卡片 → dist/
 node src/wake.mjs              # 唤醒四步：补算播报 → 四态 → 账单 → 写回 state
 node src/eat.mjs               # 「今天吃啥」：官方放行集合里真实增益最大的那一张
 node src/check.mjs             # 断言：模型判定的可用集合 == 官方放行集合，且 top1 在其中
+node src/check-store.mjs       # 断言：判的门店来自 state 绑定（不是收藏第一条），且菜单按 storeCode 同源取
 node src/preflight.mjs         # 提交前自检：必备文件、密钥泄漏、断链
 ```
 
@@ -235,13 +236,15 @@ node tools/quote.mjs --store <code> --coupon 0   # 到手价通道（券码不�
 # A. 已有真实数据（out/ 里已有响应）——直接出卡
 node src/demo.mjs --share              # 账单分享版 → dist/demo.share.html
 node src/demo.mjs --propagate          # 传播版（发群拉新）→ dist/propagate.html
-node src/demo.mjs --store 9000002      # --store 指定门店，默认取收藏第一家
+node src/demo.mjs --store 9000002      # --store 可给编码或别名；不指定时按绑定的店，没绑则收藏第一家
 
 # B. 没有真实数据：Token 填进技能目录根的 .env，先拉再出
 node tools/probe-mcp.mjs query-my-coupons
 node tools/probe-mcp.mjs query-my-account
-node tools/probe-mcp.mjs query-nearby-stores
-node tools/probe-mcp.mjs query-meals
+node tools/probe-mcp.mjs query-nearby-stores --args '{"searchType":1,"beType":1}'
+# 菜单是门店级响应（必传 storeCode），按 out/meals.<storeCode>.json 落盘——
+# 响应里不自报门店，来源只能写在文件名上
+node tools/probe-mcp.mjs query-meals --args '{"storeCode":"<门店编码>","beType":1,"orderType":1}'
 node src/demo.mjs --share
 
 # C. 都没有：退回 fixtures/ 样例，产出会标注这是样例
@@ -250,7 +253,7 @@ node src/demo.mjs --share
 
 产物 `dist/*.html` 用浏览器打开截图即可。这条链路在 `SKILL.md`「输出形状」里已写死，对话里说「生成卡片」时按同一顺序执行。
 
-**两张卡口径不同**：账单分享版把券名也收成品类名；传播版保留真券名、只脱门店名与积分数值——可核销的是券码，券名和官方券面图都不敏感，而"11.9元麦辣鸡腿堡"换成"汉堡券"就没有人想转发。出卡前两个闸门都得过：`node src/check.mjs`（判定与官方一致）+ `node src/check-share.mjs`（脱敏与取图口径）。
+**两张卡口径不同**：账单分享版把券名也收成品类名；传播版保留真券名、只脱门店名与积分数值——可核销的是券码，券名和官方券面图都不敏感，而"11.9元麦辣鸡腿堡"换成"汉堡券"就没有人想转发。出卡前三个闸门都得过：`node src/check.mjs`（判定与官方一致）+ `node src/check-share.mjs`（脱敏与取图口径）+ `node src/check-store.mjs`（判的哪家店由绑定决定，菜单与门店同源）。
 
 ### 技术要点
 
@@ -280,6 +283,7 @@ maimen-radar/
 ├── src/
 │   ├── model.mjs                唯一事实来源：四态判定、券认亲、价格阶梯、pickTop1 排序
 │   ├── state.mjs                惰性重放：快照、diff、≤3 行播报
+│   ├── store.mjs                门店解析层：绑过哪家就按哪家判，采用收藏店必须明示
 │   ├── wake.mjs                 唤醒四步入口 → 权益账单
 │   ├── eat.mjs                  「今天吃啥」唯一产出路径
 │   ├── demo.mjs                 渲染演示（--share 出账单分享版，--propagate 出传播版）
@@ -289,6 +293,7 @@ maimen-radar/
 │   ├── tone.mjs                 麦门语气：收尾语分档 + quip() 按券自动挑俏皮话
 │   ├── check.mjs                一致性断言（模型判定 == 官方放行）
 │   ├── check-share.mjs          脱敏闸门（券码/门店/积分不许出现，券名与图不许被误砍）
+│   ├── check-store.mjs          门店闸门（判的店由 state 定，菜单必须按店取，混店即红）
 │   ├── preflight.mjs            提交前自检：必备文件 / 密钥泄漏 / 断链
 │   └── data.mjs                 数据源解析：优先 out/，退回 fixtures/
 ├── tools/
