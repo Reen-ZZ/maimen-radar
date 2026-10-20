@@ -211,7 +211,8 @@ function classify(coupon, now, sceneBeType = 1, storeWin = null) {
   }
 
   const label = { now: '现在能用', later: '今天晚些能用', locked: '今天用不了', gift: '用不上就送人' }[state];
-  const glyph = { now: '🟢', later: '🟠', locked: '🔴', gift: '🟡' }[state];
+  // 红色整卡只留给「钱/损失」，状态色不碰红，否则与积分条的「已作废」撞色
+  const glyph = { now: '🟢', later: '🟠', locked: '⬜', gift: '🔵' }[state];
   return { state, label, glyph, reasons, wins, inWin, nextWindow: future ?? null };
 }
 

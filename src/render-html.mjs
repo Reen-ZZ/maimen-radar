@@ -76,10 +76,13 @@ export function renderHTML(m) {
 
   return `<style>
 .mr{
-  /* ── 色板：单一红金强调 + 中性色阶 ── */
+  /* ── 色板：单一红金强调 + 中性色阶 ──
+     色语契约（改动需与 model.mjs 的 glyph 表同步）：
+     绿=此刻能行动 · 黄=今天晚些 · 灰=今天不行 · 青=可转赠 · 红=钱/损失 · 墨=此刻游标 */
   --red:hsl(4 76% 51%); --red-ink:hsl(4 70% 38%); --red-wash:hsl(4 80% 97%);
   --gold:hsl(44 100% 53%); --gold-deep:hsl(40 92% 44%); --gold-wash:hsl(46 100% 95%); --gold-line:hsl(43 90% 82%);
   --green:hsl(150 62% 34%); --green-wash:hsl(150 55% 95%);
+  --teal:hsl(196 62% 34%); --teal-wash:hsl(196 55% 95%); --teal-line:hsl(196 40% 82%);
   --ink:hsl(220 12% 12%); --ink-2:hsl(220 8% 32%); --muted:hsl(220 6% 48%);
   --line:hsl(220 12% 91%); --surface:hsl(0 0% 100%); --surface-2:hsl(40 26% 98%); --surface-3:hsl(220 14% 95%);
   --neutral-4:hsl(220 10% 82%);
@@ -88,7 +91,7 @@ export function renderHTML(m) {
   --gradient-brand:linear-gradient(90deg,var(--red) 0%,var(--gold) 100%);
   --fill-live:linear-gradient(180deg,hsl(46 100% 66%),var(--gold));
   --fill-future:repeating-linear-gradient(135deg,var(--gold-wash) 0 5px,hsl(46 100% 91%) 5px 10px);
-  --fill-gift:repeating-linear-gradient(90deg,var(--green-wash) 0 4px,hsl(150 45% 90%) 4px 8px);
+  --fill-gift:repeating-linear-gradient(90deg,var(--teal-wash) 0 4px,hsl(196 45% 90%) 4px 8px);
   --shadow-card:0 1px 2px hsl(220 12% 12% / .05),0 18px 44px -16px hsl(220 12% 12% / .18);
 
   /* ── 排版 ── */
@@ -140,17 +143,17 @@ export function renderHTML(m) {
 .mr .chip i{width:6px;height:6px;border-radius:2px;background:var(--neutral-4)}
 .mr .chip.s-now i{background:var(--green)}
 .mr .chip.s-later i{background:var(--gold)}
-.mr .chip.s-gift i{background:var(--green);opacity:.55}
+.mr .chip.s-gift i{background:var(--teal)}
 .mr .chip.s-locked i{background:var(--neutral-4)}
 
 .mr .ruler{position:relative;height:14px;margin-bottom:var(--s2)}
 .mr .tick{position:absolute;transform:translateX(-50%);font-size:var(--fs-tick);color:var(--muted);letter-spacing:.02em}
 .mr .tick:first-child{transform:none}
 .mr .tick:last-child{transform:translateX(-100%)}
-.mr .now-chip{position:absolute;top:0;transform:translateX(-50%);background:var(--red);color:#fff;
-  font-size:var(--fs-tick);font-weight:600;padding:1px 6px;border-radius:4px;white-space:nowrap}
+.mr .now-chip{position:absolute;top:0;transform:translateX(-50%);background:var(--ink);color:#fff;
+  font-size:var(--fs-tick);font-weight:700;padding:1px 6px;border-radius:4px;white-space:nowrap}
 .mr .now-chip::after{content:"";position:absolute;left:50%;bottom:-3px;transform:translateX(-50%);
-  border:3px solid transparent;border-top-color:var(--red);border-bottom:0}
+  border:3px solid transparent;border-top-color:var(--ink);border-bottom:0}
 
 .mr ul{list-style:none;margin:0;padding:0}
 .mr .row{padding:var(--s2) 0 var(--s3);border-top:1px solid var(--surface-3)}
@@ -162,7 +165,7 @@ export function renderHTML(m) {
   background:var(--surface-3);color:var(--ink-2)}
 .mr .s-now .pill{background:var(--green-wash);color:var(--green)}
 .mr .s-later .pill{background:var(--gold-wash);color:var(--gold-deep)}
-.mr .s-gift .pill{background:var(--green-wash);color:var(--green)}
+.mr .s-gift .pill{background:var(--teal-wash);color:var(--teal)}
 .mr .s-locked .pill{background:var(--surface-3);color:var(--muted)}
 .mr .s-locked .ttl{color:var(--ink-2);font-weight:500}
 
@@ -171,10 +174,10 @@ export function renderHTML(m) {
 .mr .seg.live{background:var(--fill-live);box-shadow:inset 0 1px 0 hsl(48 100% 78% / .8)}
 .mr .seg.future{background:var(--fill-future);border:1px solid var(--gold-line)}
 .mr .seg.past{background:var(--neutral-4)}
-.mr .seg.gift{background:var(--fill-gift);border:1px solid hsl(150 40% 82%)}
+.mr .seg.gift{background:var(--fill-gift);border:1px solid var(--teal-line)}
 .mr .seg.off{background:repeating-linear-gradient(90deg,var(--line) 0 2px,transparent 2px 6px)}
-.mr .needle{position:absolute;top:0;bottom:0;width:2px;background:var(--red);z-index:2;
-  box-shadow:0 0 0 1.5px hsl(0 0% 100% / .85)}
+.mr .needle{position:absolute;top:0;bottom:0;width:2px;background:var(--ink);z-index:2;
+  box-shadow:0 0 0 1.5px hsl(0 0% 100% / .9)}
 .mr .row-meta{margin-top:var(--s1);font-size:var(--fs-meta);color:var(--muted)}
 .mr .dot-sep{margin:0 5px;opacity:.5}
 
