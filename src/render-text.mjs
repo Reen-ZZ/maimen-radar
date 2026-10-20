@@ -89,18 +89,14 @@ export function renderText(m) {
   L.push('');
 
   L.push(`💸 ${p.headline}`);
-  L.push(p.showAbsolute
-    ? `   已花掉 ${p.used}（${p.usedPct.toFixed(1)}%）· 已作废 ${p.expired}（${p.expiredPct.toFixed(1)}%）· 在手 ${p.available}`
-    : `   已花掉 ${p.usedPct.toFixed(1)}% · 已作废 ${p.expiredPct.toFixed(1)}% · 还在手 ${p.heldPct.toFixed(1)}%`);
-  if (p.expireThisMonth > 0) {
-    L.push(p.showAbsolute ? `   ⚠ 其中 ${p.expireThisMonth} 分本月到期` : '   ⚠ 本月仍有将过期积分');
-  }
+  L.push(`   已花掉 ${p.used}（${p.usedPct.toFixed(1)}%）· 已作废 ${p.expired}（${p.expiredPct.toFixed(1)}%）· 在手 ${p.available}`);
+  if (p.expireThisMonth > 0) L.push(`   ⚠ 其中 ${p.expireThisMonth} 分本月到期`);
   L.push('');
 
   const gold = m.meals.filter((x) => x.tiers.gold && x.tiers.gold < x.tiers.list)
     .map((x) => ({ ...x, save: x.tiers.list - x.tiers.gold }))
     .sort((a, b) => b.save - a.save).slice(0, 3);
-  if (gold.length && !share) {
+  if (gold.length) {
     L.push('💳 麦金卡价差最大（同一商品在菜单里是两条 SKU，按名称归并）');
     for (const g of gold) {
       const t = g.tiers;
@@ -129,7 +125,7 @@ export function renderText(m) {
   if (locked.length) L.push('→ 今天别指望：' + locked.map((c) => c.displayTitle).join('、'));
   L.push('');
   L.push(share
-    ? `   分享版已脱敏 · 以麦当劳 App 为准`
+    ? `   分享版只抹门店身份（店名里带着地址）· 以麦当劳 App 为准`
     : (() => {
         // 引导下一句：与 SKILL.md 的 5 级优先表对齐（渲染层只覆盖数据可判的 2/3/5）
         const next = p.expireThisMonth > 0 ? '「积分能换啥」看看这些分能换什么'

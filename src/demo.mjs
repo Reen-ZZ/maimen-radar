@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 /**
- * 麦门雷达 demo 入口
- *   node src/demo.mjs            → 实时版（倒计时）
- *   node src/demo.mjs --share    → 分享版（绝对时间，可转发）
+ * 麦门雷达卡片入口 —— 三档，默认走中间那档
+ *   node src/demo.mjs --share     → 分享版（默认交付的那张：抹掉门店身份，其余全真值，绝对时间可转发）
+ *   node src/demo.mjs --propagate → 发群版（同一份脱敏 model，换版面：首屏一图一价一句腔）
+ *   node src/demo.mjs             → 自用版（连门店名与地址一起印，只给自己核对）
+ * 三档脱敏只差"门店身份"这一件事，其余区别发生在渲染器——见 src/check-share.mjs 的【模型不许分叉】。
  * 数据优先取 out/（本地真实抓取，不入库），退回 fixtures/（脱敏样例，入库）。
  * 产物写入 dist/（不入库）。
  */
@@ -62,31 +64,33 @@ const common = {
 };
 
 const model = buildModel({ ...common, share });
-
 const text = renderText(model);
-const html = renderHTML(model);
-const suffix = share ? '.share' : '';
+const page = (title, body) => `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>麦门雷达 · ${title}</title>
+</head><body style="margin:0;padding:32px 12px;background:hsl(220 12% 95%);font-family:sans-serif">${body}</body></html>`;
 
 mkdirSync('dist', { recursive: true });
-writeFileSync(join('dist', `demo${suffix}.txt`), text);
-writeFileSync(join('dist', `demo${suffix}.html`), `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>麦门雷达 · ${share ? '分享版' : '权益账单'}</title>
-</head><body style="margin:0;padding:32px 12px;background:hsl(220 12% 95%);font-family:sans-serif">${html}</body></html>`);
+writeFileSync(join('dist', share ? 'demo.share.txt' : 'demo.txt'), text);
+// 带门店地址的那一张不再是交付档：自用播报只落文本，HTML 一律过了脱敏才写。
+// 少一个出口就少一种"截错图发进群"的可能——renderHTML 本身仍能吃非脱敏 model，但不给它这条路。
+if (share) writeFileSync(join('dist', 'demo.share.html'), page('分享版', renderHTML(model)));
 
-// --propagate：另出一张发群用的传播版。口径与账单分享版不同——券名保留真名，
-// 只脱门店名与积分数值（图与券名不敏感，可核销的券码本来就不上卡片）
+// --propagate：另出一张发群版。脱敏与分享版共用同一份 model（券名与积分都留真值），
+// 区别只在版面；发进群这一张不由"有没有传 --share"决定，门店身份一定抹。
 if (process.argv.includes('--propagate')) {
-  const pm = buildModel({ ...common, share: true, keepTitles: true });
-  const ph = renderPropagate(pm);
-  writeFileSync(join('dist', 'propagate.html'), `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>麦门雷达 · 传播版</title>
-</head><body style="margin:0;padding:32px 12px;background:hsl(220 12% 95%);font-family:sans-serif">${ph}</body></html>`);
+  const pm = share ? model : buildModel({ ...common, share: true });
+  writeFileSync(join('dist', 'propagate.html'), page('发群版', renderPropagate(pm)));
 }
 
 console.log(text);
 console.log('\n' + '─'.repeat(64));
 console.log(`数据来源：${SRC === 'out' ? 'out/ 本地真实抓取' : 'fixtures/ 脱敏样例'}（${SRC === 'fixtures' ? '餐品与价格为真实公开目录，身份字段已替换' : '注意别把 out/ 提交'}）`);
-console.log(`已写出 dist/demo${suffix}.txt（${text.length} 字符）与 dist/demo${suffix}.html${share ? '　【分享版·已脱敏】' : ''}`);
+console.log(share
+  ? `已写出 dist/demo.share.txt（${text.length} 字符）与 dist/demo.share.html —— 只抹门店身份，券名与积分都是真值`
+  : `已写出 dist/demo.txt（${text.length} 字符）—— 自用播报，含门店全名，不是卡片档`);
 console.log(`${storeLine(store)} · 编码 ${store?.code ?? '—'}`
   + `${menuMissing ? ' · 缺这家店的菜单快照，卡片不含到手价与上新' : ''}`);
+console.log(share
+  ? '要发进群：node src/demo.mjs --propagate　（对话里回用户：要发群说「发群」）'
+  : '要出可转发的卡片：node src/demo.mjs --share　（对话里回用户：说「生成卡片」）');
 console.log(`模型统计：券 ${model.coupons.length} 张 · 菜单实体 ${model.meals.length} 项 · 状态分布 ${JSON.stringify(model.counts)}`);

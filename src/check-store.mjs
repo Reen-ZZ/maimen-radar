@@ -159,10 +159,10 @@ if (storeLine) {
   ok(/门店：/.test(eatOut), `eat.mjs 产物里必须有门店行（门店级结论不许匿名）`);
   if (!/门店：/.test(eatOut)) console.log('    实际输出：' + eatOut.split('\n').slice(0, 3).join(' / '));
 
-  // 脱面口径：传播卡刻意匿名，账单卡必须带真名
+  // 脱面口径：发群卡刻意匿名，账单卡必须带真名
   ok(renderText(modelWith(FB.storeCode)).includes(FB.storeName), '账单文本版印真店名（使用面不脱）');
-  ok(!renderPropagate(buildModel({ ...commonOf(FB.storeCode), share: true, keepTitles: true })).includes(FB.storeName),
-    '传播版仍不得出现真店名——点名是对话里那句，不是卡片上');
+  ok(!renderPropagate(buildModel({ ...commonOf(FB.storeCode), share: true })).includes(FB.storeName),
+    '发群版仍不得出现真店名——点名是对话里那句，不是卡片上');
 } else {
   ok(false, 'storeLine 未实现');
 }

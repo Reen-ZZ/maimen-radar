@@ -64,15 +64,16 @@ export function renderPropagate(m) {
   const rest = m.coupons.filter((c) => c !== top1?.coupon).slice(0, 3);
   const gold = m.coupons.some((c) => (c.tagColors ?? []).includes(OFFICIAL_GOLD)) ? OFFICIAL_GOLD : 'hsl(44 100% 53%)';
   const red = OFFICIAL_RED;
-  const storeLabel = m.share ? '这家麦当劳' : (m.store?.name ?? '未绑定门店');
+  // 发群卡写死匿名称谓，不看 m.share —— 这张的结构就不许印店名，少一个开关少一种漏
+  const storeLabel = '这家麦当劳';
   const band = top1?.coupon.couponBand ?? null;
   const heroImg = top1 ? resolveImg(top1.coupon, m) : null;
 
   const pts = m.points.foodEquiv
     ? `<p class="pt">作废积分 ≈ <span class="ptnum">${m.points.foodEquiv.count}</span> ${esc(m.points.foodEquiv.unit)}<em>${'🍔'.repeat(Math.min(8, Math.max(1, m.points.foodEquiv.count)))}</em></p>
-       <p class="ptnote">${m.points.showAbsolute ? `你作废的 ${m.points.expired} ${esc(m.points.currency)}，` : `你作废的 ${m.points.expiredPct.toFixed(1)}% 积分，`}按「${esc(m.points.foodEquiv.anchor)}」保守折算</p>`
+       <p class="ptnote">你作废的 ${m.points.expired} ${esc(m.points.currency)}，按「${esc(m.points.foodEquiv.anchor)}」保守折算</p>`
     : `<p class="pt">你赚到的积分里，<span class="ptnum">${m.points.expiredPct.toFixed(1)}%</span> 已经作废</p>
-       ${m.points.showAbsolute ? `<p class="ptnote">共 ${m.points.accumulated} ${esc(m.points.currency)} · 花掉 ${m.points.used} · 在手 ${m.points.available}</p>` : ''}`;
+       <p class="ptnote">共 ${m.points.accumulated} ${esc(m.points.currency)} · 花掉 ${m.points.used} · 在手 ${m.points.available}</p>`;
 
   return `<style>
 .mp{
@@ -163,7 +164,7 @@ export function renderPropagate(m) {
 
   <footer>
     <p class="cta">对着你的 AI 说一句 <b>「权益账单」</b>，就有这张</p>
-    <p class="legal">数据来自麦当劳官方接口 · 价格与有效期以 App 实时结果为准${m.share ? ' · 门店与积分数值已脱敏' : ''}</p>
+    <p class="legal">数据来自麦当劳官方接口 · 价格与有效期以 App 实时结果为准 · 门店已匿名</p>
   </footer>
 </div>`;
 }

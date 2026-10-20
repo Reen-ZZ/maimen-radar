@@ -68,9 +68,9 @@ export function renderHTML(m) {
   ].join('');
 
   const foot = [
-    m.share
-      ? '分享版已脱敏：门店、券名、积分数值均为品类级信息'
-      : `数据拉取 ${esc(m.trace.serverDatetime)} · 券码已脱敏`,
+    m.trace.serverDatetime
+      ? `数据拉取 ${m.trace.serverDatetime} · 券码已脱敏`
+      : '分享版只抹去门店身份（店名里带着地址）· 券名与积分均为真值',
     '价格与有效期以麦当劳 App 实时结果为准',
   ].map((t) => `<p>${esc(t)}</p>`).join('');
 
@@ -206,12 +206,10 @@ export function renderHTML(m) {
       <div class="hero-num">${p.expiredPct.toFixed(1)}<span>%</span></div>
       <div class="hero-lbl">
         <p>累计赚到的积分已经作废</p>
-        <small>${p.showAbsolute
-          ? `共 ${p.accumulated} ${esc(p.currency)} · 花掉 ${p.used} · 作废 ${p.expired} · 在手 ${p.available}`
-          : '分享版已隐去具体数值'}</small>
+        <small>共 ${p.accumulated} ${esc(p.currency)} · 花掉 ${p.used} · 作废 ${p.expired} · 在手 ${p.available}</small>
       </div>
     </div>
-    ${p.expireThisMonth > 0 ? `<p class="warn">⚠ ${p.showAbsolute ? `本月将过期 <b>${p.expireThisMonth} 分</b>` : '本月<b>仍有积分将过期</b>'}</p>` : ''}
+    ${p.expireThisMonth > 0 ? `<p class="warn">⚠ 本月将过期 <b>${p.expireThisMonth} 分</b></p>` : ''}
     <div class="meter">
       <i class="m-used" style="width:${p.usedPct.toFixed(2)}%"></i>
       <i class="m-exp" style="width:${p.expiredPct.toFixed(2)}%"></i>

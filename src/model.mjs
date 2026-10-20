@@ -86,24 +86,13 @@ function weekdayRange(weekdays) {
   return runs.map(([a, b]) => (a === b ? NAME[a] : `${NAME[a]}~${NAME[b]}`)).join('、');
 }
 
-/** 分享版脱敏：券名 → 品类，不暴露具体消费内容 */
-const CATEGORY_RULES = [
-  [/咖啡|美式|拿铁|麦咖啡|卡布奇诺|摩卡/i, '咖啡饮品'],
-  [/麦旋风|新地|圆筒|冰淇淋|圣代|甜筒/, '冰淇淋'],
-  [/鸡腿堡|巨无霸|麦辣|板烧|安格斯|汉堡|堡/, '汉堡类'],
-  [/炸鸡|鸡翅|麦翅|王牌鸡|蘸酱/, '炸鸡小食'],
-  [/薯条|薯饼|薯格/, '薯类'],
-  [/松饼|猪柳蛋|早餐|粥|油条/, '早餐'],
-  [/派|曲奇|蛋糕|甜品|可可|黑巧/, '甜品'],
-  [/可乐|汽水|奶昔|果汁|饮料|茶/, '饮料'],
-  [/沙拉|玉米|杯|果蔬/, '轻食'],
-];
-const categorize = (title) => {
-  for (const [re, name] of CATEGORY_RULES) if (re.test(String(title))) return `${name}券`;
-  return '其他权益券';
-};
-
-/** 门店名脱敏：「麦当劳惠州博罗天虹餐厅」→「一家麦当劳餐厅」 */
+/**
+ * 门店身份脱敏。
+ * 店名本身就是地址（实测「麦当劳深圳龙胜地铁站D出口餐厅」嵌城市+地铁站+出口编号），
+ * 所以"只抹地址、留着店名"在数据上做不到——只能整块换成通用称谓。
+ * 券名与积分数值不在此列：券名不可核销（要的是 code 不是标题），积分数值不定位人，
+ * 把它们脱掉只会让卡片答不了"那是哪张券""还差多少分"。
+ */
 const genericStore = () => '一家麦当劳餐厅';
 
 /**
@@ -224,7 +213,7 @@ function hoursLeftText(endAt, now) {
   return `剩 ${Math.ceil(h / 24)} 天`;
 }
 
-export function buildModel({ couponsRaw, accountRaw, mealsRaw, storeCouponsRaw, store, serverNow, share = false, keepTitles = false, sceneBeType = 1 }) {
+export function buildModel({ couponsRaw, accountRaw, mealsRaw, storeCouponsRaw, store, serverNow, share = false, sceneBeType = 1 }) {
   const now = serverNow ?? parseServerTime(couponsRaw?.datetime) ?? new Date();
   // code:499 =「无券可领/券包为空」，稳定语义非故障；其余 success:false 才是接口异常
   const couponsNote = (couponsRaw?.success === false)
@@ -279,7 +268,7 @@ export function buildModel({ couponsRaw, accountRaw, mealsRaw, storeCouponsRaw, 
     const di = c.discountInfo ?? {};
     return {
       title: realTitle,
-      displayTitle: share && !keepTitles ? categorize(realTitle) : realTitle,
+      displayTitle: realTitle,
       couponImage: couponImg(c.image),
       couponBand: couponImg(c.bigImage),
       // 内部稳定键：id 是哈希，不可核销，可安全用于跨轮 diff；绝不渲染给用户
@@ -371,10 +360,7 @@ export function buildModel({ couponsRaw, accountRaw, mealsRaw, storeCouponsRaw, 
     }
   }
 
-  points.showAbsolute = !share;
-  points.headline = share
-    ? `你赚到的${p.currency ?? '积分'}里，${points.expiredPct.toFixed(1)}% 已经作废`
-    : `你累计赚到 ${points.accumulated} ${points.currency}`;
+  points.headline = `你累计赚到 ${points.accumulated} ${points.currency}`;
 
   const rawStore = store ?? { code: '', name: '未绑定门店' };
 
