@@ -67,6 +67,15 @@
 | `toastText` | 官方现成限制文案，如"该券仅限麦当劳App使用"，直接引用。 |
 | 分页 | `pageSize` 上限 200、`page` 上限 5 → 按 1000 张设计。 |
 
+## 券面图（✅ 2026-10-20 真实账号实测）
+
+- 每张券自带 `image`（600×600 方图，多为透明底抠图）与 `bigImage`（1035×516 官方促销横幅），实测 **4/4 有值**。host 是腾讯云 COS `mcd-portal-prod-cos1-…myqcloud.com`，与菜单图 `menu-img.mcd.cn`、商城图 `img.mcd.cn` **分属三个域名**——"图来自官方"不等于来自同一个 CDN。
+- URL 带 `sign` 参数（COS 标准签名，内含 `q-sign-algorithm/q-ak/q-sign-time/q-key-time/q-signature`）。实测 `q-sign-time` 为 `2026-10-12 → 2031-10-11`，**有效期 5 年，不是短时效签名**；无 referer 防盗链（三种 referer 均 200）。热链可用，但仍是外链依赖。
+- `bigImage` 图上**烘焙了价格与渠道字样**：实测三张横幅烘焙价与券价一致（11.9/19.9/9.9），但「到店／麦乐送同享」**不是每张都有**（冰美式那张是 IIAC 金奖杯图，没有外送字样）。图是像素，程序判不了里面写了什么字——所以任何"小字注明"必须写成**无条件为真**的句子，不许断言"图中有某字样"。
+- 「任选」类券的 SKU 菜单里没有（见上节），但官方为它单独画了组合图（8 选 2 全画出来了）。**券自带图正好补在菜单图覆盖不到的地方**，这是取图链把它排在第 ① 级的原因；菜单图（`meals[].image`，实测 107/107）降为兜底。
+- 品牌色：`tags[].color` 实测稳定下发 `#FFBC0D`（金）；`#DB0007`（红）**只在 fixtures 的 `instructions.availableTime[].color` 里出现过，真实数据未见**。金色可以数据驱动，红色不行——写死并标注来源，别假装是取来的。
+- 券面图与券名一样**不属于敏感信息**，故模型里以 `couponImage`/`couponBand` 独立存在、不随 `share` 清空（可核销的 `code` 与整包 `raw` 仍然清空）。判据见 `src/check-share.mjs`。
+
 ## 积分（`query-my-account`，无入参）
 
 - 只有**月粒度**：`currentMouthExpirePoint` / `lastMouthExpirePoint` / `nextMouthExpirePoint`。没有精确到期日，文案只能是"本月将过期 N 分"。

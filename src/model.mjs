@@ -106,6 +106,13 @@ const categorize = (title) => {
 /** 门店名脱敏：「麦当劳惠州博罗天虹餐厅」→「一家麦当劳餐厅」 */
 const genericStore = () => '一家麦当劳餐厅';
 
+/**
+ * 券面图（方图与横幅）是官方营销素材，不含任何可核销信息，因此**不随 share 清空**。
+ * 脱敏脱的是券码与门店身份，把图一起砍掉等于让传播版没有图。
+ * `.invalid` 是 RFC 保留域，脱敏样例用它占位——按此排除，样例才不会渲染出裂图。
+ */
+const couponImg = (v) => (typeof v === 'string' && v.startsWith('https://') && !v.includes('.invalid/') ? v : null);
+
 export const REPORT_NAME = '权益账单';
 
 /**
@@ -216,7 +223,7 @@ function hoursLeftText(endAt, now) {
   return `剩 ${Math.ceil(h / 24)} 天`;
 }
 
-export function buildModel({ couponsRaw, accountRaw, mealsRaw, storeCouponsRaw, store, serverNow, share = false, sceneBeType = 1 }) {
+export function buildModel({ couponsRaw, accountRaw, mealsRaw, storeCouponsRaw, store, serverNow, share = false, keepTitles = false, sceneBeType = 1 }) {
   const now = serverNow ?? parseServerTime(couponsRaw?.datetime) ?? new Date();
   // code:499 =「无券可领/券包为空」，稳定语义非故障；其余 success:false 才是接口异常
   const couponsNote = (couponsRaw?.success === false)
@@ -228,7 +235,9 @@ export function buildModel({ couponsRaw, accountRaw, mealsRaw, storeCouponsRaw, 
   const mealIndex = new Map();
   for (const [code, e] of Object.entries(mealsRaw?.data?.meals ?? {})) {
     const key = e.name;
-    const cur = mealIndex.get(key) ?? { name: key, tiers: {} };
+    const cur = mealIndex.get(key) ?? { name: key, tiers: {}, image: null };
+    // 同名多条 SKU（麦金卡是另一条 code）取第一个能用的官方图，供渲染器兜底取图
+    if (!cur.image) cur.image = couponImg(e.image);
     if (Number(e.originalPrice) > 0) {
       cur.tiers.list = Math.max(cur.tiers.list ?? 0, Number(e.originalPrice));
       cur.tiers.sale = cur.tiers.sale == null ? Number(e.currentPrice) : Math.min(cur.tiers.sale, Number(e.currentPrice));
@@ -269,7 +278,9 @@ export function buildModel({ couponsRaw, accountRaw, mealsRaw, storeCouponsRaw, 
     const di = c.discountInfo ?? {};
     return {
       title: realTitle,
-      displayTitle: share ? categorize(realTitle) : realTitle,
+      displayTitle: share && !keepTitles ? categorize(realTitle) : realTitle,
+      couponImage: couponImg(c.image),
+      couponBand: couponImg(c.bigImage),
       // 内部稳定键：id 是哈希，不可核销，可安全用于跨轮 diff；绝不渲染给用户
       key,
       codeMasked: maskCode(c.code),
@@ -284,6 +295,11 @@ export function buildModel({ couponsRaw, accountRaw, mealsRaw, storeCouponsRaw, 
       quota: Number(c.currentDayAvailableCount ?? 0),
       totalQuota: Number(c.totalAvailableCount ?? 0),
       scopeTags: (c.tags ?? []).filter((t) => t?.type === 2).map((t) => t.label),
+      // 官方随券下发的品牌色（实测金 #FFBC0D 稳定下发，红只在部分文案里出现）
+      // 属设计 token 不属个人信息，故同样不随 share 清空
+      tagColors: [...new Set((c.tags ?? [])
+        .map((t) => t?.color).filter((x) => typeof x === 'string' && /^#[0-9A-Fa-f]{6}$/.test(x))
+        .map((x) => x.toUpperCase()))],
       dueTodayTag: (c.tags ?? []).some((t) => t?.value === 'due today'),
       channelNote: c.toastText ?? '',
       receivedDays: c.receivedDays ?? null,

@@ -12,6 +12,7 @@ import { load, sourceDir } from './data.mjs';
 import { buildModel } from './model.mjs';
 import { renderText } from './render-text.mjs';
 import { renderHTML } from './render-html.mjs';
+import { renderPropagate } from './render-propagate.mjs';
 
 const SRC = sourceDir();
 if (!SRC) {
@@ -59,6 +60,24 @@ writeFileSync(join('dist', `demo${suffix}.txt`), text);
 writeFileSync(join('dist', `demo${suffix}.html`), `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>麦门雷达 · ${share ? '分享版' : '权益账单'}</title>
 </head><body style="margin:0;padding:32px 12px;background:hsl(220 12% 95%);font-family:sans-serif">${html}</body></html>`);
+
+// --propagate：另出一张发群用的传播版。口径与账单分享版不同——券名保留真名，
+// 只脱门店名与积分数值（图与券名不敏感，可核销的券码本来就不上卡片）
+if (process.argv.includes('--propagate')) {
+  const pm = buildModel({
+    couponsRaw,
+    accountRaw: accountRaw ?? { data: {} },
+    mealsRaw: mealsRaw ?? { data: {} },
+    storeCouponsRaw,
+    store: pick ? { code: pick.storeCode, name: pick.storeName } : null,
+    share: true,
+    keepTitles: true,
+  });
+  const ph = renderPropagate(pm);
+  writeFileSync(join('dist', 'propagate.html'), `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>麦门雷达 · 传播版</title>
+</head><body style="margin:0;padding:32px 12px;background:hsl(220 12% 95%);font-family:sans-serif">${ph}</body></html>`);
+}
 
 console.log(text);
 console.log('\n' + '─'.repeat(64));

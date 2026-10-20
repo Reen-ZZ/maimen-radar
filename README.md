@@ -88,7 +88,7 @@
 | 5 | 到手价 | `算到手价` | 让服务端把带券成交价算出来；券没生效它会直说没生效 |
 | 6 | 抢救 | `麦旋风那张为什么用不了` | 人话原因 + 换个取餐方式能不能救 + 能不能转赠止损 |
 | 7 | 门店 | `绑一下公司那家店` | 按城市+关键词查店 → 你确认 → 以后按这家算；换店一句话覆盖 |
-| 8 | 传播 | `生成卡片` | 脱敏小票卡片，浏览器打开截图就能发群 |
+| 8 | 传播 | `生成卡片` | 两种卡：账单分享版（全脱敏）与传播版（真券名 + 官方券面图），浏览器打开截图就能发群 |
 | 9 | 次要 | `最近有啥活动` / `积分能换啥` | 活动日历、把作废积分换算成"够换几份饭"（问才答，不当主打） |
 | 10 | 上新 | `上新了什么` | 当期官方"上新"标签的全量新品（现价 + 麦金卡价如有）；权益账单里也常驻一段，不用问就在 |
 
@@ -226,7 +226,8 @@ node tools/quote.mjs --store <code> --coupon 0   # 到手价通道（券码不�
 
 ```bash
 # A. 已有真实数据（out/ 里已有响应）——直接出卡
-node src/demo.mjs --share              # 分享版 → dist/demo.share.html
+node src/demo.mjs --share              # 账单分享版 → dist/demo.share.html
+node src/demo.mjs --propagate          # 传播版（发群拉新）→ dist/propagate.html
 node src/demo.mjs --store 9000002      # --store 指定门店，默认取收藏第一家
 
 # B. 没有真实数据：Token 填进技能目录根的 .env，先拉再出
@@ -241,6 +242,8 @@ node src/demo.mjs --share
 ```
 
 产物 `dist/*.html` 用浏览器打开截图即可。这条链路在 `SKILL.md`「输出形状」里已写死，对话里说「生成卡片」时按同一顺序执行。
+
+**两张卡口径不同**：账单分享版把券名也收成品类名；传播版保留真券名、只脱门店名与积分数值——可核销的是券码，券名和官方券面图都不敏感，而"11.9元麦辣鸡腿堡"换成"汉堡券"就没有人想转发。出卡前两个闸门都得过：`node src/check.mjs`（判定与官方一致）+ `node src/check-share.mjs`（脱敏与取图口径）。
 
 ### 技术要点
 
@@ -272,11 +275,13 @@ maimen-radar/
 │   ├── state.mjs                惰性重放：快照、diff、≤3 行播报
 │   ├── wake.mjs                 唤醒四步入口 → 权益账单
 │   ├── eat.mjs                  「今天吃啥」唯一产出路径
-│   ├── demo.mjs                 渲染演示（--share 出分享版卡片）
+│   ├── demo.mjs                 渲染演示（--share 出账单分享版，--propagate 出传播版）
 │   ├── render-text.mjs          使用面版式：纯 Unicode，32 格时段条
-│   ├── render-html.mjs          传播面：小票卡片
-│   ├── tone.mjs                 麦门语气，按情境分档
+│   ├── render-html.mjs          账单分享面：小票卡片
+│   ├── render-propagate.mjs     拉新传播面：官方券面图主视觉 + 14px 字号底线
+│   ├── tone.mjs                 麦门语气：收尾语分档 + quip() 按券自动挑俏皮话
 │   ├── check.mjs                一致性断言（模型判定 == 官方放行）
+│   ├── check-share.mjs          脱敏闸门（券码/门店/积分不许出现，券名与图不许被误砍）
 │   ├── preflight.mjs            提交前自检：必备文件 / 密钥泄漏 / 断链
 │   └── data.mjs                 数据源解析：优先 out/，退回 fixtures/
 ├── tools/
