@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { load, loadScoped, sourceDir } from './data.mjs';
 import { buildModel } from './model.mjs';
 import { renderText } from './render-text.mjs';
-import { resolveStore, needsAnnounce, storeAnnounce } from './store.mjs';
+import { resolveStore, storeLine } from './store.mjs';
 import { load as loadState, save, snapshot, diff, wakeLines } from './state.mjs';
 import { withCloser, banter } from './tone.mjs';
 
@@ -77,14 +77,14 @@ if (menuGap) {
   console.error(`✗ 门店 ${menuGap} 没有菜单快照，本轮不算到手价与省额 —— `
     + `node tools/probe-mcp.mjs query-meals --args '{"storeCode":"${menuGap}","beType":1,"orderType":1}'`);
 }
-// 用户没确认过的店必须说一句是哪家（收藏自动采用也算）；确认绑定过的不重复声明
-if (needsAnnounce(store)) console.log(storeAnnounce(store));
+// 门店级结论每轮点名一次（真名在账单抬头，这行补口径与来源）
+if (store) console.log(storeLine(store));
 console.log(`state 已写回：${join('state', 'maimen-radar.json')}（last_seen = ${model.trace.serverDatetime || model.nowText}）`);
 if (!store) {
   console.log('冷启动引导：第①步（账户级盘点）已完成，停在第②步补门店——'
-    + 'query-nearby-stores(searchType=1) 读收藏，无则 searchType=2 按城市+关键词，仍无则明示降级口径。');
+    + 'node src/bind.mjs 列出收藏候选，回个数字就绑好；无收藏则 searchType=2 按城市+关键词。');
 } else if (d.needStore) {
-  console.log(`门店已落盘：${store.code}（${storeAnnounce(store)}），下一轮起不再催绑。`);
+  console.log(`门店已落盘：${store.code}，下一轮起不再催绑。`);
 } else {
   console.log('冷启动引导：已完成，常态唤醒（补算 → 四态 → 答题 → 写回）。');
 }

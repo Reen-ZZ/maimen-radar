@@ -127,6 +127,7 @@
 
 ## 活动日历（`campaign-calendar`）
 
+- **不分店，也不分城**（✅ 2026-10-20 实测）：入参 schema 里**没有 `storeCode`**，响应全树扫下来**一个地域键都没有**（无 city/region/store/area/province）。所以这句结论不许挂门店名——SKILL.md 路由表把它标成 `全国`，`src/check-store.mjs` 有断言专门盯这一点：谁把 campaign-calendar 或 mall-points-products 标成门店级，闸门就红。
 - 结构是 `{ currentTime, dailyList[], subscribedEvents[] }`。
 - `dailyList[].events[]` 的正文在 **`articleDto.title` / `articleDto.content`**；`activityTitle` 常为空字符串。
 - `specifiedDate`（`yyyy-MM-dd`）可锚定到某天及前后各一个有活动的日子。

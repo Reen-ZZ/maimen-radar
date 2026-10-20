@@ -18,7 +18,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { load, loadScoped, sourceDir } from './data.mjs';
 import { buildModel, pickTop1 } from './model.mjs';
-import { resolveStore, needsAnnounce, storeAnnounce } from './store.mjs';
+import { resolveStore, storeLine } from './store.mjs';
 import { load as loadState } from './state.mjs';
 import { withCloser } from './tone.mjs';
 
@@ -120,8 +120,8 @@ if (!store) {
   closerKind = t.verdict === 'ok' || t.verdict === 'great' ? 'saved' : 'neutral';
 }
 
-// 用户没确认过的店必须明示是哪家（SKILL.md:55）——插在第 2 行，不会被 5 行上限截掉
-if (needsAnnounce(store)) L.splice(1, 0, `   ${storeAnnounce(store)}`);
+// 门店级结论每轮都要点名（2026-10-20 硬规则）——插在第 2 行，不会被 5 行上限截掉
+if (store) L.splice(1, 0, `   ${storeLine(store)}`);
 if (SRC !== 'out') L.push(`（样例数据 · fixtures 快照）`);
 
 console.log(L.slice(0, 5).join('\n'));

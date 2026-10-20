@@ -86,19 +86,37 @@ export function useStore(state, code) {
 }
 
 /**
- * 这家店是否需要向用户明示来源。
- * 判据只有一条：**用户确认过没有**。按收藏自动采用的、本轮临时指定的，都得说；
- * 确认绑定过的不必每轮重复声明。少了这个判据，自动采用会在第二轮伪装成用户的选择。
+ * 从收藏里取一家店，供「回个数字就绑好」用。
+ * 命中顺序：编码精确 > 编号（1 起） > 店名/地址关键词。
+ * 多命中只给候选、零命中返回空——**不猜、不编门店**（SKILL.md 绑店第 3 步的硬规则）。
  */
-export function needsAnnounce(store) {
-  return !!store && store.origin !== 'user';
+export function pickFavorite(favorites, key) {
+  const k = String(key ?? '').trim();
+  const wrap = (hits) => ({
+    matched: hits.length === 1,
+    store: hits.length === 1 ? fromFavorite(hits[0]) : null,
+    candidates: hits.map(fromFavorite),
+  });
+  const byCode = favorites.filter((f) => String(f.storeCode) === k);
+  if (byCode.length) return wrap(byCode);
+  if (/^[1-9]\d*$/.test(k)) {
+    const f = favorites[Number(k) - 1];
+    if (f) return wrap([f]);
+  }
+  return wrap(favorites.filter((f) => `${f.storeName ?? ''}${f.address ?? ''}`.includes(k)));
 }
 
-/** 给回复用的一句门店声明。来源不同，话不同——采用收藏店必须说清是"按收藏判的" */
-export function storeAnnounce(store) {
-  if (!store) return '未绑店，以下按券包字段推断，未经门店过滤确认';
-  const label = store.alias || store.name || store.code;
-  if (store.source === 'arg') return `本轮按「${label}」判（临时指定，不改绑定）`;
-  if (needsAnnounce(store)) return `按你收藏的「${label}」判的——这家还没跟你确认过，换店说一声`;
-  return `按你绑定的「${label}」判的`;
+/**
+ * 门店级结论的口径行。每轮都要有，不许沉默——
+ * 结论对不对取决于店，用户不知道是哪家就没法判断。（2026-10-20 定的硬规则）
+ *
+ * `source`（本轮怎么定的）与 `origin`（当初怎么进 state 的）决定后缀：
+ * 自动采用的不能伪装成用户确认过，临时指定的要说清不改绑定。
+ */
+export function storeLine(store) {
+  if (!store) return '门店：未定 —— 以下结论不带任何门店口径，别当成本地某家店';
+  const label = store.alias ? `${store.alias}（${store.name ?? store.code}）` : (store.name ?? store.code);
+  const note = store.source === 'arg' ? '本轮临时指定，不改绑定'
+    : store.origin !== 'user' ? '按收藏采用，还没跟你确认过' : '';
+  return `门店：${label}${note ? `，${note}` : ''}`;
 }

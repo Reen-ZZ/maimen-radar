@@ -68,7 +68,9 @@ export function renderText(m) {
   const L = [];
 
   L.push(`📡 麦门雷达 · ${m.reportName}${share ? '（分享版）' : ''}`);
-  L.push(`   ${m.nowText} ${m.weekdayLabel} · ${ell(m.store.name, 26)} · 券 ${m.coupons.length} 张`);
+  // 门店名不许截断：账单是「此刻这家店真能用哪张」，被切成"龙胜地铁站D出…"就没法核对是哪一家。
+  // 这一行没有表格要对齐，挤出去一行也比认错店便宜。（时段条自己 59 列，不受影响）
+  L.push(`   ${m.nowText} ${m.weekdayLabel} · ${m.store.name} · 券 ${m.coupons.length} 张`);
   if (m.couponsNote) L.push(`   ⚠ ${m.couponsNote}`);
   L.push('');
 

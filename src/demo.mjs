@@ -11,7 +11,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { load, loadScoped, sourceDir } from './data.mjs';
 import { buildModel } from './model.mjs';
-import { resolveStore } from './store.mjs';
+import { resolveStore, storeLine } from './store.mjs';
 import { load as loadState } from './state.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -87,6 +87,6 @@ console.log(text);
 console.log('\n' + '─'.repeat(64));
 console.log(`数据来源：${SRC === 'out' ? 'out/ 本地真实抓取' : 'fixtures/ 脱敏样例'}（${SRC === 'fixtures' ? '餐品与价格为真实公开目录，身份字段已替换' : '注意别把 out/ 提交'}）`);
 console.log(`已写出 dist/demo${suffix}.txt（${text.length} 字符）与 dist/demo${suffix}.html${share ? '　【分享版·已脱敏】' : ''}`);
-console.log(`判店：${store ? `${store.code} ${store.name ?? ''}（来源 ${store.source}）` : '未定 —— 卡片不印任何门店结论'}`
+console.log(`${storeLine(store)} · 编码 ${store?.code ?? '—'}`
   + `${menuMissing ? ' · 缺这家店的菜单快照，卡片不含到手价与上新' : ''}`);
 console.log(`模型统计：券 ${model.coupons.length} 张 · 菜单实体 ${model.meals.length} 项 · 状态分布 ${JSON.stringify(model.counts)}`);

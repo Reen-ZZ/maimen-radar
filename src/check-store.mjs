@@ -16,11 +16,17 @@
  * 本闸门查的是「文件名与所判门店是否一致」与「缺该店快照时是否停下」，
  * 查不出「有人把 A 店文件改名成 B 店」——那只能靠抓取时不手改文件名。
  */
+import { execFileSync } from 'node:child_process';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { load, sourceDir } from './data.mjs';
 import { buildModel } from './model.mjs';
+import { renderText } from './render-text.mjs';
+import { renderPropagate } from './render-propagate.mjs';
 import { snapshot, diff, wakeLines } from './state.mjs';
 
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DIR = sourceDir();
 if (!DIR) { console.error('✗ 没有 out/ 或 fixtures/'); process.exit(1); }
 
@@ -30,9 +36,10 @@ const ok = (cond, msg) => { console.log(`${cond ? '✓' : '✗'} ${msg}`); if (!
 /* store.mjs 是解析层。缺它时闸门要「红得起来」而不是崩在半路，所以按可选依赖取。 */
 let resolveStore = null;
 let bindStore = null;
-let needsAnnounce = null;
+let storeLine = null;
+let pickFavorite = null;
 try {
-  ({ resolveStore, bindStore, needsAnnounce } = await import('./store.mjs'));
+  ({ resolveStore, bindStore, storeLine, pickFavorite } = await import('./store.mjs'));
 } catch {
   console.log('（src/store.mjs 尚不存在，解析与绑定两项按未实现记红）');
 }
@@ -52,7 +59,7 @@ const asStore = (s) => ({ code: s.storeCode, name: s.storeName });
 const EMPTY = { schema: 1, last_seen: null, stores: [], sceneBeType: 1, coupons: {}, points: {}, saved: { entries: 0, total: 0 }, menu: {} };
 
 const mealsOf = (code) => loadScoped('meals', code);
-const modelWith = (code) => buildModel({
+const commonOf = (code) => ({
   couponsRaw: load('query-my-coupons.json'),
   accountRaw: load('query-my-account.json'),
   mealsRaw: mealsOf(code),
@@ -60,6 +67,7 @@ const modelWith = (code) => buildModel({
   store: asStore(favorites.find((s) => s.storeCode === code)),
   sceneBeType: 1,
 });
+const modelWith = (code) => buildModel(commonOf(code));
 
 console.log(`数据来源：${DIR}/  收藏：${favorites.map((s) => `${s.storeCode} ${s.storeName}`).join(' / ')}\n`);
 
@@ -100,15 +108,10 @@ if (bindStore) {
   ok(twice.stores.some((s) => s.code === FB.storeCode)
     && twice.stores.find((s) => s.isDefault)?.code === FA.storeCode,
     '折入新店不得抢走已有默认店（静默换店会让结论全错而用户不知情）');
-  // 采用≠绑定：没确认过的店，落盘之后也必须被认出来并明示
-  const adopted = snapshot(EMPTY, modelWith(FB.storeCode));
-  const again = resolveStore({ state: adopted, favorites });
-  ok(needsAnnounce?.(again) === true,
-    `按收藏自动采用的店，下一轮仍要求明示（不能升格成「你绑定的」）：source=${again?.source} origin=${again?.origin}`);
-  ok(needsAnnounce?.(resolveStore({ state: bindStore(EMPTY, asStore(FB), { alias: '家' }), favorites })) === false,
-    '用户确认过的绑定不必每轮重复声明');
-  ok(needsAnnounce?.(resolveStore({ state: EMPTY, favorites })) === true,
-    '本轮刚采用收藏店时必须明示');
+  // 采用≠绑定：没确认过的店，落盘之后也不能升格成「用户绑的」
+  const again = resolveStore({ state: snapshot(EMPTY, modelWith(FB.storeCode)), favorites });
+  ok(again.origin !== 'user' && again.source === 'state',
+    `自动采用的店落盘后 origin 仍是 ${again.origin}，不许伪装成用户确认过`);
 } else {
   ok(false, 'bindStore 未实现');
 }
@@ -132,6 +135,69 @@ const legacy = ['wake.mjs', 'eat.mjs', 'demo.mjs', 'check.mjs', 'check-share.mjs
     catch { return false; }
   });
 ok(!legacy.length, `没有代码从无 key 的 query-meals.json 读菜单${legacy.length ? ` → 仍在读：${legacy.join('、')}` : ''}`);
+
+console.log('\n【点名层】凡门店级结论，每一轮都要说清是哪家店');
+if (storeLine) {
+  const none = storeLine(null);
+  ok(typeof none === 'string' && none.includes('未定'),
+    `没有门店时也要出一行口径说明，不能沉默：「${none}」`);
+  const adopted2 = resolveStore({ state: snapshot(EMPTY, modelWith(FB.storeCode)), favorites });
+  const l1 = storeLine(adopted2);
+  ok(l1.includes(FB.storeName) && /还没跟你确认|未确认/.test(l1),
+    `按收藏自动采用的店：点名 + 标注没确认过 →「${l1}」`);
+  const l2 = storeLine(resolveStore({ state: bindStore(EMPTY, asStore(FB), { alias: '家' }), favorites }));
+  ok(l2.includes('家') && !/还没跟你确认/.test(l2),
+    `确认绑定过的店：点名即可，不再带注记 →「${l2}」`);
+  const l3 = storeLine(resolveStore({ state: EMPTY, arg: FA.storeCode, favorites }));
+  ok(l3.includes(FA.storeName) && /临时/.test(l3), `临时指定的店必须写明不改绑定 →「${l3}」`);
+
+  // 真跑一次「今天吃啥」——用户看到的那句里到底有没有门店，只有产物能证明
+  let eatOut = '';
+  try {
+    eatOut = execFileSync(process.execPath, ['src/eat.mjs'], { cwd: ROOT, encoding: 'utf8', timeout: 60000 });
+  } catch (e) { eatOut = String(e.stdout ?? '') + String(e.stderr ?? ''); }
+  ok(/门店：/.test(eatOut), `eat.mjs 产物里必须有门店行（门店级结论不许匿名）`);
+  if (!/门店：/.test(eatOut)) console.log('    实际输出：' + eatOut.split('\n').slice(0, 3).join(' / '));
+
+  // 脱面口径：传播卡刻意匿名，账单卡必须带真名
+  ok(renderText(modelWith(FB.storeCode)).includes(FB.storeName), '账单文本版印真店名（使用面不脱）');
+  ok(!renderPropagate(buildModel({ ...commonOf(FB.storeCode), share: true, keepTitles: true })).includes(FB.storeName),
+    '传播版仍不得出现真店名——点名是对话里那句，不是卡片上');
+} else {
+  ok(false, 'storeLine 未实现');
+}
+
+console.log('\n【绑店入口】零输入绑店：从收藏里挑，别让用户打店名');
+if (pickFavorite) {
+  const byIndex = pickFavorite(favorites, '1');
+  ok(byIndex?.matched && byIndex.store.code === FA.storeCode,
+    `编号 1 → ${byIndex?.store?.code} ${byIndex?.store?.name ?? ''}`);
+  ok(pickFavorite(favorites, FA.storeCode)?.store?.code === FA.storeCode, '按编码也能取到');
+  ok(pickFavorite(favorites, '麦当劳')?.candidates?.length === favorites.length
+    && pickFavorite(favorites, '麦当劳').matched === false,
+    '多命中只给候选、不替用户挑（两家都叫"麦当劳"）');
+  ok(pickFavorite(favorites, '不存在的地名').candidates.length === 0
+    && !pickFavorite(favorites, '不存在的地名').store,
+    '零命中不返回任何门店——不猜、不编');
+  ok(!!pickFavorite(favorites, '龙胜')?.store?.address, '候选带地址，供"是这家吗"那句确认');
+} else {
+  ok(false, 'pickFavorite 未实现');
+}
+
+console.log('\n【口径路由表】SKILL.md 每个意图都要标口径，门店级与全国级不许混为一谈');
+{
+  const md = readFileSync(new URL('../SKILL.md', import.meta.url), 'utf8');
+  const seg = md.split('## 按意图选路')[1]?.split(/\n## /)[0] ?? '';
+  const rows = seg.split('\n').filter((l) => l.trim().startsWith('|') && !/^\s*\|[-:\s|]+\|\s*$/.test(l));
+  const dataRows = rows.slice(1); // 第 0 行是表头
+  ok(dataRows.length >= 8, `路由表读到 ${dataRows.length} 行意图（异常偏少说明表结构变了）`);
+  const noScope = dataRows.filter((r) => (r.split('|').length - 2) < 4).map((r) => r.split('|')[1]?.trim());
+  ok(!noScope.length, `每行都有「口径」列${noScope.length ? ` → 缺列：${noScope.join('、')}` : ''}`);
+  const badScope = dataRows.filter((r) => !/(门店级|账户级|全国)/.test(r)).map((r) => r.split('|')[1]?.trim());
+  ok(!badScope.length, `口径取值必须是 门店级 / 账户级 / 全国${badScope.length ? ` → 非法：${badScope.join('、')}` : ''}`);
+  const lies = dataRows.filter((r) => /campaign-calendar|mall-points-products/.test(r) && /门店级/.test(r));
+  ok(!lies.length, `活动日历与积分商城不得被标成门店级（实测入参无 storeCode、响应无地域键）`);
+}
 
 console.log('\n【现算一遍】两家店各自的结论。菜单 traceId 若两家相同，就是在拿同一家店的价目表算两家');
 for (const s of favorites) {
