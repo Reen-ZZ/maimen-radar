@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 提交前自检：报名硬性文件、密钥泄漏、内部链接、敏感数据是否会被提交。
+ * 提交前自检：报名硬性文件、密钥泄漏、内部链接、敏感数据是否会被提交，**并真的把三道闸门各跑一遍**。
  *   node src/preflight.mjs
  * 退出码非 0 表示不要提交、不要报名。
  */
@@ -8,6 +8,7 @@ import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const REQUIRED = ['README.md', 'CONTEST_DECLARATION.md', 'MCP_INTEGRATION.md', 'mcp-config.example.json', 'workbuddy.md'];
@@ -133,6 +134,33 @@ for (const f of readdirSync(join(ROOT, 'fixtures')).filter((x) => x.startsWith('
 if (!existsSync(join(ROOT, 'src', 'journey.mjs')) || readFileSync(join(ROOT, '.gitignore'), 'utf8').includes('src/journey.mjs')) {
   ok('src/journey.mjs 未入库（其产物属非公开设计文档）');
 } else bad('src/journey.mjs 会被提交，但它生成的 docs/user-journey.md 属非公开文件');
+
+/**
+ * 【7】闸门必须**真的执行**。
+ * 这一节之前只做 `existsSync`，于是 preflight 打印「✓ 全部通过，可以提交」的**同时**，
+ * `check.mjs` 正在打印「1 项不通过」、`check-store.mjs` 正在带堆栈崩溃（2026-10-20 实测）。
+ * 「闸门文件在」与「闸门过得去」是两件事，前者根本不该被叫做自检。
+ */
+console.log('\n【7】闸门实跑（判定一致性 / 脱敏 / 门店层）');
+const GATES = ['src/check.mjs', 'src/check-share.mjs', 'src/check-store.mjs'];
+const MCD_ENV = { ...process.env };
+delete MCD_ENV.MCD_DATA; // 闸门默认优先吃 out/，本自检不替它改口径
+for (const g of GATES) {
+  if (!existsSync(join(ROOT, g))) { bad(`${g} 不存在`); continue; }
+  let status = 0, text = '';
+  try {
+    text = execFileSync(process.execPath, [g], { cwd: ROOT, encoding: 'utf8', timeout: 180000, env: MCD_ENV, stdio: ['ignore', 'pipe', 'pipe'] });
+  } catch (e) {
+    status = typeof e.status === 'number' ? e.status : -1;
+    text = String(e.stdout ?? '') + String(e.stderr ?? '');
+  }
+  if (status === -1 && /ETIMEDOUT|timed out/i.test(text)) { bad(`${g} 跑超时（180s）`); continue; }
+  if (status === 0) { ok(`${g} 退出码 0`); continue; }
+  bad(`${g} 退出码 ${status} —— 不要提交、不要报名`);
+  const lines = text.split(/\r?\n/).map((l) => l.trimEnd()).filter(Boolean);
+  const reds = lines.filter((l) => /^(✗|BAD| Error|error:)/.test(l) || /不通过|未通过|无法/.test(l)).slice(0, 6);
+  (reds.length ? reds : lines.slice(-4)).forEach((l) => console.log(`      ${l.slice(0, 160)}`));
+}
 
 console.log(fail ? `\n✗ ${fail} 项未通过，不要提交、不要报名` : '\n✓ 全部通过，可以提交');
 process.exit(fail ? 1 : 0);

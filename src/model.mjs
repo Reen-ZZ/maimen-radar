@@ -120,6 +120,39 @@ export function isNoCouponsAvailable(raw) {
 const BETYPE_NAME = { 1: '到店自取', 2: '麦乐送', 5: '得来速', 6: '企业团餐' };
 
 /**
+ * 麦金卡价商品的唯一判据（T2）。
+ * 实测 `canWithOrder === true` ⟺ `discountType === '随单购麦金卡优惠'`，两家店集合完全相同。
+ * 判据**必须是实体字段**：只认分类引用的「麦金卡」tag 会漏判 2 条（1420721）/ 5 条（1420370）。
+ * 而这些商品的 `currentPrice` 就是麦金卡价 —— 非麦金卡用户并不付这个价。
+ */
+export const GOLD_DISCOUNT_TYPE = '随单购麦金卡优惠';
+const isGoldPriced = (e) => e?.discountType === GOLD_DISCOUNT_TYPE;
+
+/**
+ * 「周边」（帽子/徽章/毛绒这类非餐品）**没有任何结构化字段可认**（2026-10-20 两店全量核对）：
+ * 实体字段与真餐品完全同构，分类也同在「小食甜品/其他」。只剩两条易碎启发式的并集——
+ * tag 表（`521946 旋旋星愿贴` 名字里没关键词，全靠 tag 命中）与名字表（`521954 复古棒球帽`
+ * 官方只给 ["上新"]，全靠「帽」命中；`521955 麦当劳联名徽章` 两个都没有原名字表，是复查补的「徽章」）。
+ * 官方改个名就会静默漏判，所以 `src/check.mjs` 必须对**两家店**都留断言。
+ */
+const PERIPHERY_NAME = /周边|帽|徽章|捶痒痒挠|毛绒/;
+const PERIPHERY_TAGS = new Set(['汪苏泷限量周边', '既可捶背', '又可挠痒']);
+export const isPeriphery = (name, tags = []) =>
+  PERIPHERY_NAME.test(name ?? '') || (tags ?? []).some((t) => PERIPHERY_TAGS.has(t));
+
+/**
+ * 命中了哪一条信号（`'name'` / `'tag'` / `'both'` / `null`）。
+ * 存在的理由是让闸门能证明**两条线各自都在干活**：只测一家店时，删掉任何一条表都不报错，
+ * 漏判要等官方改名那天才暴露。实测 1420721 没有 tag-only 的周边、1420370 才有（`521946`），
+ * 而 name-only 两家都有（`521743` / `521954` / `521955`）。
+ */
+export const peripherySignal = (name, tags = []) => {
+  const byName = PERIPHERY_NAME.test(name ?? '');
+  const byTag = (tags ?? []).some((t) => PERIPHERY_TAGS.has(t));
+  return byName && byTag ? 'both' : byName ? 'name' : byTag ? 'tag' : null;
+};
+
+/**
  * 生效起始时间。优先结构化字段 tradeStartDateTime；
  * 若未来只给 datetimeText（"2026-10-12 00:00-2026-10-18 23:59"），取左侧兜底。
  */
@@ -242,9 +275,59 @@ export function buildModel({ couponsRaw, accountRaw, mealsRaw, storeCouponsRaw, 
       if (!rec) continue;
       // 新品只认 "上新" 这一个精确 tag——"新升级""清爽上新"等营销 tag 语义不纯，不猜
       if ((ref.tags ?? []).includes('上新')) rec.isNew = true;
-      if ((ref.tags ?? []).includes('麦金卡')) rec.tiers.gold = Number(e.currentPrice);
+      // 麦金卡档按实体字段判，不按引用 tag（见 GOLD_DISCOUNT_TYPE 的注释）
+      if (isGoldPriced(e)) rec.tiers.gold = Number(e.currentPrice);
     }
   }
+
+  /**
+   * 分类维度（T1）。为什么模型层非留不可：
+   *   组合套餐的**实体名里没有「1+1」**（`9900013304` 叫「人气经典随心配」），只有分类名有，
+   *   实测原始分类名还含换行（「随心配\n1+1」），所以必须先去换行再匹配。
+   * ⚠️ 分类名**不得进 `mealIndex` 的 key** —— 那套名字空间是券商品 join 与价格阶梯的唯一来源，
+   *   混进第二套命名必然串味。同理 `newItems` 按 code 存：归并后的 `tiers` 是
+   *   max(原价)/min(现价)，官方一旦给同名不同价的新品就会算错省额。
+   */
+  const categories = [];
+  const comboMap = new Map();
+  const newMap = new Map();
+  /**
+   * 同一个 code 可能被多个分类引用，而**周边的 tag 信号不一定落在第一次引用的那个分类上**
+   * （实测 `521946 旋旋星愿贴` 的名字里没有关键词，全靠 tag「既可捶背」命中）。
+   * 所以按 code 收、tag 取并集，再判周边 —— 只认第一次引用会漏。
+   */
+  const mergeRef = (map, row) => {
+    const prev = map.get(row.code);
+    if (!prev) { map.set(row.code, { ...row, tags: [...row.tags], periphery: isPeriphery(row.name, row.tags) }); return; }
+    prev.tags = [...new Set([...prev.tags, ...row.tags])];
+    prev.periphery = isPeriphery(prev.name, prev.tags);
+  };
+  for (const cat of mealsRaw?.data?.categories ?? []) {
+    const name = String(cat.name ?? '').replace(/\n/g, '');
+    const isCombo = /1\+1/.test(name);
+    const codes = [];
+    for (const ref of cat.meals ?? []) {
+      const e = mealsRaw?.data?.meals?.[ref.code];
+      if (!e) continue;
+      codes.push(ref.code);
+      const tags = ref.tags ?? [];
+      if (isCombo) mergeRef(comboMap, { code: ref.code, name: e.name, base: Number(e.currentPrice), tags });
+      if (tags.includes('上新')) {
+        const cur = Number(e.currentPrice);
+        const orig = Number(e.originalPrice);
+        mergeRef(newMap, {
+          code: ref.code, name: e.name, cur, orig, tags,
+          // 省额必须 toFixed（实测 30 − 19.9 = 10.100000000000001，不修会印出这条尾巴）
+          save: +(orig - cur).toFixed(1),
+          goldPriced: isGoldPriced(e),
+          discounted: cur < orig,
+        });
+      }
+    }
+    categories.push({ name, isCombo, codes });
+  }
+  const comboOffers = [...comboMap.values()];
+  const newItems = [...newMap.values()];
   // 官方个性化锚点：data.frequent = {code, tags:["我的常点"]}（fields.md 已记录）
   const frequent = mealsRaw?.data?.frequent
     ? (() => {
@@ -309,7 +392,12 @@ export function buildModel({ couponsRaw, accountRaw, mealsRaw, storeCouponsRaw, 
           };
         })
         : null,
-      storeWindow: storeWin && !storeWin.outOfRange ? `这家店 ${hhmm(storeWin.from)}-${storeWin.to >= 1440 ? '23:59' : hhmm(storeWin.to)} 能刷` : null,
+      storeWindow: storeWin && !storeWin.outOfRange
+        ? `这家店 ${hhmm(storeWin.from)}-${storeWin.to >= 1440 ? '23:59' : hhmm(storeWin.to)} 能刷` : null,
+      // 「今天吃啥」的末行要把时段挂在券上（`①② 用的那张券：10:30-23:59 能刷`），
+      // 那里不能再带「这家店」三个字 —— 时段留一份纯文本，别在渲染层做字符串手术
+      windowText: storeWin && !storeWin.outOfRange
+        ? `${hhmm(storeWin.from)}-${storeWin.to >= 1440 ? '23:59' : hhmm(storeWin.to)}` : null,
       raw: share ? null : c,
     };
   });
@@ -380,6 +468,9 @@ export function buildModel({ couponsRaw, accountRaw, mealsRaw, storeCouponsRaw, 
     counts,
     points,
     meals: [...mealIndex.values()].filter((m) => m.tiers.list != null || m.tiers.sale != null),
+    categories,
+    comboOffers,
+    newItems,
     frequent,
     storeCouponIds: [...officialCoupons.keys()],
     trace: share
@@ -415,6 +506,77 @@ export function couponLadder(model, productName, couponPrice) {
 }
 
 /**
+ * 三轨各挑一条（T3）。**排成一张榜是被明令禁止的**（D9）：
+ *   ① 的「真省」= 菜单现价 − 券价（有券 vs 无券，用户真到手的差额）；
+ *   ③ 的「省」= 原价 − 现价（划线价口径，用户本来就只付现价，那 ¥48 从来没付到过）。
+ * 两个数不同源、份量也不同（¥11.9 的汉堡 vs ¥26.9 的三件套）—— 拿 21.1 压 10.6，
+ * 会推出「看着省最多、其实你本来就要付 ¥26.9」的新品，把真省的券挤掉。
+ * ② 的省**恒等于** ① 的省：1+1 是套餐价，那一分不参与任何减法（用户裁定 D-新2）。
+ */
+export function pickThree(model, { comboDetail = null } = {}) {
+  const one = pickTop1(model);
+  const t = one.top1;
+  const coupon = t ? {
+    title: t.coupon.title,
+    name: t.product?.name ?? t.coupon.title,
+    code: t.product?.code ?? null,
+    image: t.product?.image ?? null,
+    sale: t.product?.sale ?? null,
+    couponPrice: t.coupon.couponPrice ?? null,
+    gain: t.gain != null ? +t.gain.toFixed(1) : null,
+    verdict: t.verdict ?? null,
+    windowText: t.coupon.windowText ?? null,
+    quota: t.coupon.quota ?? 0,
+  } : null;
+
+  // ② 轨的意义是「顺手把券用掉」，没有券就没有这一轨（1+1 单买属 ③ 之外的另一件事）
+  const offer = coupon ? pickComboOffer(model) : null;
+  let combo = null;
+  if (offer) {
+    const read = comboReadMode(comboDetail, coupon.code ? [coupon.code] : []);
+    const mode = read?.mode ?? 'b';
+    combo = {
+      code: offer.code, name: offer.name, base: offer.base,
+      via: model.frequent && offer.code === model.frequent.code ? 'frequent' : 'priceAsc',
+      interval: comboInterval(comboDetail, offer.base),
+      readMode: mode,
+      // no-detail 时 (a) 无从判断，按服务端唯一实测过的 (b) 走，并把依据标出来
+      readBasis: read ? 'choices' : 'no-detail',
+      // (a)「1+1 里那件能用券」的合计从没取过证 —— 不报金额，只报单品价（D5 的降级口径）
+      total: mode === 'b' ? +(offer.base + (coupon.couponPrice ?? 0)).toFixed(1) : null,
+      save: coupon.gain,
+    };
+  }
+
+  // ③ 轨的三道闸（D15=②：**这里排除周边，权益账单不排除，是有意的两把筛子**）
+  //   · 这一屏答「吃什么」，帽子徽章是噪音；账单答「这期有什么」，联名周边也是权益。
+  //   · 麦金卡价商品必须挡住：它们的 currentPrice 就是麦金卡价，非会员并不付这个价，
+  //     拿它算「省 ¥5」是假账（当前两店的麦金卡新品恰好都是周边、被上一条挡着，
+  //     但那是巧合，规则必须显式写，不能指望周边规则兜底）。
+  const rows = model.newItems ?? [];
+  const pool = rows.filter((x) => !x.periphery && !x.goldPriced && x.discounted)
+    .sort((a, b) => b.save - a.save || a.cur - b.cur);
+
+  return {
+    coupon, combo, item: pool[0] ?? null,
+    second: one.second ? { title: one.second.coupon.title, gain: +one.second.gain.toFixed(1) } : null,
+    outcast: one.outcast, fallback: one.fallback,
+    // 末行归属必须按「哪几条轨真的用了这张券」现算（T11）：早餐 ② 缺席时要变成「①」
+    uses: coupon ? (combo ? '①②' : '①') : null,
+    // ③ 轨的**真实候选池**必须暴露出来：闸门若自己再算一遍"正确的池子"就是同义反复，
+    // pickThree 的筛选回归（比如哪天忘了排除周边）它一条都抓不到 —— 2026-10-21 变异测试实测
+    newPool: pool.map((x) => ({ code: x.code, name: x.name, save: x.save })),
+    trackCount: [coupon, combo, pool[0] ?? null].filter(Boolean).length,
+    counts: {
+      newTotal: rows.length,
+      periphery: rows.filter((x) => x.periphery).length,
+      goldPriced: rows.filter((x) => x.goldPriced && !x.periphery).length,
+      eatable: pool.length,
+    },
+  };
+}
+
+/**
  * 积分商城的 `price` 字段恒为 0，真实元值埋在 `selling` 文案开头（"18.8元麦辣鸡腿汉堡两件套"）。
  * 必须解析，不许硬编码。解析不出返回 null，由调用方决定不展示金额。
  */
@@ -427,6 +589,87 @@ export function parseYuan(...strs) {
 }
 
 export { TRACK, BLOCKS };
+
+/**
+ * ② 轨选款（T19 / 裁定 D13=②）。顺序不能反：
+ *   1. 官方个性化锚点 `frequent` 命中候选 → 用它（与券轨「我的常点」同口径）；
+ *   2. 否则在候选里按**菜单到手价升序**取第一款。
+ * 分支 2 是常态而不是备胎：实测 `frequent` 不每店每时段都下发（1420721 早餐、1420370 晚餐都没有）。
+ * ⚠️ 不得只认分类里的第一项 —— 两店 refs 恰好都是 3304 在前，那是巧合；官方一改顺序就会错 ¥1。
+ */
+export function pickComboOffer(model) {
+  const offers = model?.comboOffers ?? [];
+  if (!offers.length) return null;
+  const freq = model.frequent?.code ?? null;
+  return offers.find((o) => o.code === freq)
+    ?? [...offers].sort((a, b) => a.base - b.base)[0];
+}
+
+/**
+ * `diffPrice` 是**给普通人看的字符串**（实测 `"+ ¥0"` / `"- ¥1"`），不是数字。
+ * 解析不出就返回 null 让调用方**别算**，不许猜一个 0 —— 猜错是错钱。
+ */
+function diffValue(c) {
+  const raw = c?.diffPrice;
+  if (raw == null || raw === '') return 0;
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
+  const s = String(raw);
+  const digits = s.replace(/[^\d.]/g, '');
+  // 剥完一个数字都不剩（例：「待定」）必须返回 null 让上层**别算** ——
+  // Number('') === 0，不拦就把认不出的差价静默当成 ¥0 加价
+  if (!digits) return null;
+  const n = Number(digits);
+  if (!Number.isFinite(n)) return null;
+  return /[-−]/.test(s) ? -n : n;
+}
+
+/** 组合套餐的全部可选件 code —— 这是唯一能看到「1+1 里面是什么」的地方（菜单里没有构成信息） */
+export function comboChoiceCodes(detailRaw) {
+  const codes = new Set();
+  for (const r of detailRaw?.data?.rounds ?? []) {
+    for (const c of r.choices ?? []) if (c?.code) codes.add(String(c.code));
+  }
+  return codes;
+}
+
+/**
+ * 1+1 的实付区间（T16）。锚点是**该款自己的基准价**（菜单 `currentPrice`）+ 各 round 选中项的 `diffPrice`。
+ * 实测两款的符号方向相反：同一批 5 个单品在 `9900013304`（基准 ¥14.9）里标 −¥1，
+ * 在 `9900015568`（基准 ¥13.9）里标 +¥0 → **写死「负号=更便宜」会在第二款上算反 ¥1**。
+ * 每个 round 恰选 `quantity` 件，所以 min/max 各取该 round 最小/最大的 q 个 diff 之和。
+ * 拿不到 rounds、或有任一选项解析不出 → 返回 null（不算，不猜）。
+ */
+export function comboInterval(detailRaw, base) {
+  const rounds = detailRaw?.data?.rounds ?? [];
+  if (!rounds.length || !Number.isFinite(base)) return null;
+  let lo = base, hi = base, def = base;
+  for (const r of rounds) {
+    const choices = r.choices ?? [];
+    const vals = choices.map(diffValue);
+    if (!choices.length || vals.some((v) => v == null)) return null;
+    const q = Math.max(1, Number(r.quantity ?? 1));
+    const sorted = [...vals].sort((a, b) => a - b);
+    lo += sorted.slice(0, q).reduce((a, b) => a + b, 0);
+    hi += sorted.slice(-q).reduce((a, b) => a + b, 0);
+    def += choices.filter((c) => Number(c.isDefault) === 1)
+      .reduce((a, c) => a + (diffValue(c) ?? 0), 0);
+  }
+  return { lo: +lo.toFixed(1), hi: +hi.toFixed(1), def: +def.toFixed(1) };
+}
+
+/**
+ * ② 轨的读法（T17）：可选件里有没有放行券的商品。
+ *   有 → (a) 一单两件（1+1 里那件直接用券）；没有 → (b) 1+1 再另买一份用券商品。
+ * 当前券包实测走 (b)：三张放行券的商品都不在 24 个可选件里，且服务端亲自拒过单独挂券
+ * （`600012 促销规则不支持该商品`）。**但这是数据结论，不是规则** —— 官方换券就要翻回 (a)，
+ * 所以这里只认 `query-meal-detail` 的 choices，不写死。取不到构成时返回 null，由调用方按 (b) 降级。
+ */
+export function comboReadMode(detailRaw, releasedCodes = []) {
+  const codes = comboChoiceCodes(detailRaw);
+  if (!codes.size) return null;
+  const hits = [...new Set(releasedCodes.map(String))].filter((c) => codes.has(c));
+  return { mode: hits.length ? 'a' : 'b', hits, choices: codes.size };
+}
 
 /**
  * 「今天吃啥」的 top1 选择器（写死，回复里不许另挑）。

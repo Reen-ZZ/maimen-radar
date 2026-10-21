@@ -2,7 +2,7 @@
   "success": true,
   "code": 200,
   "message": "请求成功",
-  "datetime": "2026-10-20 13:00:11",
+  "datetime": "2026-10-20 19:38:50",
   "traceId": "dcedd36bd7bb3a5dc745d9ef644230ba",
   "data": {
     "categories": [
@@ -13,12 +13,6 @@
             "code": "9900016076",
             "tags": [
               "心形薯饼同款比心"
-            ]
-          },
-          {
-            "code": "9900016075",
-            "tags": [
-              "浓郁奶香拉丝芝士"
             ]
           },
           {
@@ -62,9 +56,6 @@
             "tags": [
               "汪苏泷限量周边"
             ]
-          },
-          {
-            "code": "515946"
           }
         ]
       },
@@ -102,13 +93,6 @@
         "name": "鸡肉汉堡\n/卷",
         "meals": [
           {
-            "code": "9900016075",
-            "tags": [
-              "上新",
-              "浓郁奶香拉丝芝士"
-            ]
-          },
-          {
             "code": "9900016073",
             "tags": [
               "上新",
@@ -116,23 +100,10 @@
             ]
           },
           {
-            "code": "521953",
-            "tags": [
-              "上新",
-              "浓郁奶香拉丝芝士"
-            ]
-          },
-          {
             "code": "521952",
             "tags": [
               "上新",
               "韩式辣椒黄油风味"
-            ]
-          },
-          {
-            "code": "9900016310",
-            "tags": [
-              "麦金卡"
             ]
           },
           {
@@ -584,14 +555,6 @@
             ]
           },
           {
-            "code": "521986",
-            "tags": [
-              "上新",
-              "趁热拉丝",
-              "奶香醇厚"
-            ]
-          },
-          {
             "code": "9900016082",
             "tags": [
               "上新",
@@ -641,20 +604,6 @@
               "上新",
               "口口酥脆",
               "薯香十足"
-            ]
-          },
-          {
-            "code": "521917",
-            "tags": [
-              "上新",
-              "快乐旋开吃"
-            ]
-          },
-          {
-            "code": "521919",
-            "tags": [
-              "上新",
-              "庆生筒乐"
             ]
           },
           {
@@ -907,12 +856,6 @@
             ]
           },
           {
-            "code": "6352",
-            "tags": [
-              "冷饮"
-            ]
-          },
-          {
             "code": "3755",
             "tags": [
               "冷饮"
@@ -1058,13 +1001,6 @@
         "image": "https://menu-img.mcd.cn/pcm/prod/menu/ProductPool/product/MS_6102_320.png",
         "currentPrice": "7",
         "originalPrice": "7",
-        "canWithOrder": false
-      },
-      "6352": {
-        "name": "阳光橙麦炫酷",
-        "image": "https://menu-img.mcd.cn/pcm/prod/menu/ProductPool/product/MS_6352_320.png",
-        "currentPrice": "13",
-        "originalPrice": "13",
         "canWithOrder": false
       },
       "6362": {
@@ -1271,20 +1207,6 @@
         "originalPrice": "14.9",
         "canWithOrder": false
       },
-      "521917": {
-        "name": "泷愿成真麦旋风——大米风味",
-        "image": "https://menu-img.mcd.cn/pcm/prod/menu/ProductPool/product/MS_G521917_320.gif",
-        "currentPrice": "16",
-        "originalPrice": "16",
-        "canWithOrder": false
-      },
-      "521919": {
-        "name": "奶香大米风味双旋圆筒",
-        "image": "https://menu-img.mcd.cn/pcm/prod/menu/ProductPool/product/MS_G521919_320.gif",
-        "currentPrice": "5",
-        "originalPrice": "5",
-        "canWithOrder": false
-      },
       "521929": {
         "name": "旋旋水手帽",
         "image": "https://menu-img.mcd.cn/pcm/prod/menu/20260916/product/MS_521929_320.png",
@@ -1320,13 +1242,6 @@
         "originalPrice": "24",
         "canWithOrder": false
       },
-      "521953": {
-        "name": "龙焰芝士棒鸡腿堡",
-        "image": "https://menu-img.mcd.cn/pcm/prod/menu/ProductPool/product/MS_521953_320.png",
-        "currentPrice": "27",
-        "originalPrice": "27",
-        "canWithOrder": false
-      },
       "521954": {
         "name": "麦当劳联名复古棒球帽",
         "image": "https://menu-img.mcd.cn/pcm/prod/menu/ProductPool/product/MS_521954_320.png",
@@ -1356,14 +1271,6 @@
         "image": "https://menu-img.mcd.cn/pcm/prod/menu/ProductPool/product/MS_521966_320.png",
         "currentPrice": "3",
         "originalPrice": "3",
-        "canWithOrder": false
-      },
-      "521986": {
-        "name": "马苏里拉拉丝芝士条",
-        "image": "https://menu-img.mcd.cn/pcm/prod/menu/ProductPool/product/MS_G521986_320.png",
-        "currentPrice": "11",
-        "originalPrice": "15.5",
-        "discountType": "促销优惠",
         "canWithOrder": false
       },
       "9900005456": {
@@ -1404,13 +1311,6 @@
         "image": "https://menu-img.mcd.cn/pcm/prod/menu/ProductPool/product/MS_9900016077_320.gif",
         "currentPrice": "11.9",
         "originalPrice": "17",
-        "canWithOrder": false
-      },
-      "9900016075": {
-        "name": "龙焰芝士棒鸡腿堡三件套",
-        "image": "https://menu-img.mcd.cn/pcm/prod/menu/ProductPool/product/MS_9900016075_320.png",
-        "currentPrice": "29.9",
-        "originalPrice": "51",
         "canWithOrder": false
       },
       "9900016073": {
@@ -1612,18 +1512,6 @@
         "name": "龙焰美味四件套",
         "image": "https://menu-img.mcd.cn/pcm/prod/menu/ProductPool/product/MS_9900016311_320.gif",
         "currentPrice": "29",
-        "originalPrice": "57",
-        "discountType": "随单购麦金卡优惠",
-        "withOrder": {
-          "membershipCode": "106",
-          "specId": "880"
-        },
-        "canWithOrder": true
-      },
-      "9900016310": {
-        "name": "龙焰芝士棒鸡腿堡四件套",
-        "image": "https://menu-img.mcd.cn/pcm/prod/menu/ProductPool/product/MS_9900016310_320.png",
-        "currentPrice": "32",
         "originalPrice": "57",
         "discountType": "随单购麦金卡优惠",
         "withOrder": {
@@ -1901,12 +1789,6 @@
         "originalPrice": "15",
         "canWithOrder": false
       }
-    },
-    "frequent": {
-      "code": "9900013304",
-      "tags": [
-        "我的常点"
-      ]
     }
   }
 }

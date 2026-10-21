@@ -26,9 +26,22 @@ const PROBE_VERSION = '2025-06-18';
  * 这些响应的内容按门店变（实测两店菜单 17 个价差 / 20 个店独占单品），
  * 但响应体里不自报门店，所以门店来源只能写在文件名里。无 key 落盘等于把来源丢掉。
  */
+/**
+ * 门店级响应必须按 key 落盘（响应体里不自报门店/商品，来源只存在于入参）。
+ * key 函数收的是**整个 args 对象**：`query-meal-detail` 的身份证是 `code`（商品），
+ * 不是 storeCode —— 它此前落在无 key 的 `query-meal-detail.json` 上，
+ * 结果换一家店、换一个套餐再跑就**覆盖掉上一份证据**（2026-10-20 真的冲掉过一次）。
+ */
 const SCOPED_OUTPUT = {
-  'query-meals': (code) => `meals.${code}`,
-  'query-store-coupons': (code) => `store-coupons.${code}`,
+  'query-meals': (a) => `meals.${a.storeCode}`,
+  'query-store-coupons': (a) => `store-coupons.${a.storeCode}`,
+  'query-meal-detail': (a) => `meal-detail.${a.code}`,
+};
+/** 落盘文件名用的是入参里的哪几个字段（打印出来，好让人核对这份证据是谁家的） */
+const SCOPED_KEYS = {
+  'query-meals': ['storeCode'],
+  'query-store-coupons': ['storeCode'],
+  'query-meal-detail': ['code'],
 };
 
 function loadToken() {
@@ -263,13 +276,16 @@ async function main() {
   // 门店级响应按 storeCode 键落盘。`query-meals` 的响应里**没有任何门店身份字段**
   // （顶层只有 success/code/message/datetime/traceId/data），门店来源只存在于请求参数里——
   // 不写进文件名就等于丢掉，于是 A 店的券能配上 B 店的价目表。
-  const scoped = SCOPED_OUTPUT[toolName] && toolArgs?.storeCode
-    ? SCOPED_OUTPUT[toolName](String(toolArgs.storeCode))
-    : null;
-  const outFile = join(OUT_DIR, `${scoped ?? toolName}.json`);
+  const scopedFn = SCOPED_OUTPUT[toolName];
+  const scoped = scopedFn ? scopedFn(toolArgs ?? {}) : null;
+  // 认不出身份证（缺 storeCode / 缺 code）时退回工具名落盘，并**明确警告**会覆盖上一份，
+  // 而不是默默写进一个带 "undefined" 的文件名里
+  const keyed = scoped && !/undefined|null/.test(scoped);
+  const outFile = join(OUT_DIR, `${keyed ? scoped : toolName}.json`);
   writeFileSync(outFile, JSON.stringify(data, null, 2));
   console.log(`✓ 原始响应已存 ${outFile.replace(ROOT + '/', '')}`
-    + (scoped ? `（门店级，按 storeCode=${toolArgs.storeCode} 键）` : ''));
+    + (keyed ? `（按 ${(SCOPED_KEYS[toolName] ?? ['storeCode']).join('+')} 键）`
+      : scopedFn ? `⚠ 本应按键落盘但入参缺身份证（storeCode/code 没传？），现写进 ${toolName}.json，再跑一次会覆盖它` : ''));
 
   if (result?.isError) console.log('⚠ 服务端标记 isError=true，内容：\n' + JSON.stringify(data).slice(0, 800));
 
