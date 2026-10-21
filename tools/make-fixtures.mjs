@@ -65,14 +65,21 @@ const remapStores = (data) => JSON.parse(JSON.stringify(data).replace(/1420721|1
   write('query-nearby-stores.json', j);
 }
 // 4. 门店级菜单：每家一份，文件名带 storeCode（响应里不自报门店，来源只能写在名字上）
+// ⚠ 只认 `meals.<纯数字>.json`。out/ 里还会有按时段另存的那几份
+//    （`meals.1420721.breakfast-2026-10-21T0730.json` 等，探针 ④ 的取证），
+//    它们是「另一个时段的本店菜单」，不是另一家店，也不是当前样本源 —— 跳过并说明，
+//    否则这里会在 `.match(...)[1]` 上抛 TypeError 把整个生成打断（2026-10-21 实测）。
 for (const f of readdirSync(OUT).filter((x) => x.startsWith('meals.'))) {
+  const hit = f.match(/^meals\.(\d+)\.json$/);
+  if (!hit) { console.log(`  · 跳过 out/${f}（按时段/别名另存的证据，不是「这家店当前菜单」的样本源）`); continue; }
   const j = read(f);
   j.traceId = hex(f);
-  const old = f.match(/^meals\.(\d+)\.json$/)[1];
-  write(`meals.${STORE_MAP[old] ?? old}.json`, j);
+  write(`meals.${STORE_MAP[hit[1]] ?? hit[1]}.json`, j);
 }
 // 5. 两家门店的可用券
 for (const f of readdirSync(OUT).filter((x) => x.startsWith('store-coupons.'))) {
+  const hit = f.match(/^store-coupons\.(\d+)\.json$/);
+  if (!hit) { console.log(`  · 跳过 out/${f}（命名不是 store-coupons.<门店码>.json）`); continue; }
   const j = read(f);
   for (const c of j.data ?? []) {
     c.couponCode = fakeCode(c.title);
@@ -80,8 +87,7 @@ for (const f of readdirSync(OUT).filter((x) => x.startsWith('store-coupons.'))) 
     if (Array.isArray(c.products)) for (const p of c.products) delete p.productUrl;
   }
   j.traceId = hex(f);
-  const old = f.match(/(\d+)\.json$/)[1];
-  write(`store-coupons.${STORE_MAP[old] ?? old}.json`, remapStores(j));
+  write(`store-coupons.${STORE_MAP[hit[1]] ?? hit[1]}.json`, remapStores(j));
 }
 // 6. 其余只读接口
 for (const f of ['now-time-info.json', 'available-coupons.json', 'campaign-calendar.json', 'mall-points-products.json']) {

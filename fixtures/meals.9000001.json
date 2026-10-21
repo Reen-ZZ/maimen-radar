@@ -2,7 +2,7 @@
   "success": true,
   "code": 200,
   "message": "请求成功",
-  "datetime": "2026-10-20 10:38:27",
+  "datetime": "2026-10-19 17:44:25",
   "traceId": "efb5a69e067717df4b716892177eaac6",
   "data": {
     "categories": [
@@ -28,6 +28,12 @@
             ]
           },
           {
+            "code": "9900016077",
+            "tags": [
+              "韩式芝士风味酱上新"
+            ]
+          },
+          {
             "code": "9900016311"
           },
           {
@@ -47,9 +53,6 @@
             "tags": [
               "汪苏泷限量周边"
             ]
-          },
-          {
-            "code": "515946"
           }
         ]
       },
@@ -239,6 +242,13 @@
       {
         "name": "蘸酱炸鸡",
         "meals": [
+          {
+            "code": "9900016078",
+            "tags": [
+              "蘸酱炸鸡",
+              "韩式芝士风味酱上新"
+            ]
+          },
           {
             "code": "9900015729",
             "tags": [
@@ -531,6 +541,12 @@
             "tags": [
               "单品"
             ]
+          },
+          {
+            "code": "9900005432",
+            "tags": [
+              "单品"
+            ]
           }
         ]
       },
@@ -765,6 +781,9 @@
             "tags": [
               "粉丝之选"
             ]
+          },
+          {
+            "code": "9900011126"
           },
           {
             "code": "9900011123"
@@ -1205,11 +1224,25 @@
         },
         "canWithOrder": true
       },
+      "9900016078": {
+        "name": "蘸酱麦麦脆汁鸡",
+        "image": "https://menu-img.mcd.cn/pcm/prod/menu/ProductPool/product/MS_9900016078_320.png",
+        "currentPrice": "11.9",
+        "originalPrice": "18",
+        "canWithOrder": false
+      },
       "9900016076": {
         "name": "“我就喜欢”鸡薯双全盒",
         "image": "https://menu-img.mcd.cn/pcm/prod/menu/ProductPool/product/MS_9900016076_320.png",
         "currentPrice": "15.9",
         "originalPrice": "29.5",
+        "canWithOrder": false
+      },
+      "9900016077": {
+        "name": "蘸酱炸鸡",
+        "image": "https://menu-img.mcd.cn/pcm/prod/menu/ProductPool/product/MS_9900016077_320.gif",
+        "currentPrice": "11.9",
+        "originalPrice": "17.5",
         "canWithOrder": false
       },
       "9900016075": {
@@ -1403,7 +1436,7 @@
       "9900015730": {
         "name": "BFF四宫格小食盘",
         "image": "https://menu-img.mcd.cn/pcm/prod/menu/ProductPool/product/MS_9900015730_320.gif",
-        "currentPrice": "39.3",
+        "currentPrice": "40.3",
         "originalPrice": "54.5",
         "canWithOrder": false
       },
@@ -1460,7 +1493,7 @@
       "9900015729": {
         "name": "蘸酱BFF四宫格小食盘",
         "image": "https://menu-img.mcd.cn/pcm/prod/menu/ProductPool/product/MS_9900015729_320.gif",
-        "currentPrice": "42.3",
+        "currentPrice": "43.3",
         "originalPrice": "57.5",
         "canWithOrder": false
       },
@@ -1469,6 +1502,13 @@
         "image": "https://menu-img.mcd.cn/pcm/prod/menu/ProductPool/product/MS_9900013304_320.png",
         "currentPrice": "14.9",
         "originalPrice": "14.9",
+        "canWithOrder": false
+      },
+      "9900011126": {
+        "name": "酥脆无双套餐",
+        "image": "https://menu-img.mcd.cn/pcm/prod/menu/20260701/product/MS_9900011126_320.png",
+        "currentPrice": "20.5",
+        "originalPrice": "20.5",
         "canWithOrder": false
       },
       "9900015602": {
@@ -1684,6 +1724,13 @@
         "image": "https://menu-img.mcd.cn/pcm/prod/menu/20260824/product/MS_9900005430_320.png",
         "currentPrice": "42.5",
         "originalPrice": "55.5",
+        "canWithOrder": false
+      },
+      "9900005432": {
+        "name": "麦麦脆汁鸡1块",
+        "image": "https://menu-img.mcd.cn/pcm/prod/menu/ProductPool/product/MS_9900005432_320.png",
+        "currentPrice": "15",
+        "originalPrice": "15",
         "canWithOrder": false
       }
     },

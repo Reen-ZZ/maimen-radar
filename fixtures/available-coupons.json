@@ -1,8 +1,39 @@
 {
-  "success": false,
-  "code": 499,
-  "message": "No coupons available",
-  "datetime": "2026-10-18 20:29:29",
+  "success": true,
+  "code": 200,
+  "message": "请求成功",
+  "datetime": "2026-10-19 14:02:23",
   "traceId": "2e5f141a4119759237357c1385203312",
-  "data": null
+  "data": [
+    {
+      "couponName": "19.9元王牌炸鸡任选2",
+      "couponImage": "https://img.mcd.cn/cms/images/940ded2256905944.png",
+      "couponStatus": "HAVING_RECEIVE",
+      "label": "已领取"
+    },
+    {
+      "couponName": "11.9元麦辣鸡腿堡",
+      "couponImage": "https://mcd-portal-prod-cos1-1300270282.cos.ap-shanghai.myqcloud.com/campaign/prod/campaign-offer/coupon/058b4977563b4a5aa1939fc9352928b8/%E9%BA%A6%E8%BE%A3%E9%B8%A1%E8%85%BF%E5%A0%A1600x600.png?sign=q-sign-algorithm%3Dsha1%26q-ak%3DAKIDCD6mEcX25tVrjNxiPvEICas0uXyBKIBs%26q-sign-time%3D1791793121%3B1949473121%26q-key-time%3D1791793121%3B1949473121%26q-header-list%3D%26q-url-param-list%3D%26q-signature%3D1f84cc471de3b6465e28e6d829553c2b500871bf",
+      "couponStatus": "HAVING_RECEIVE",
+      "label": "已领取"
+    },
+    {
+      "couponName": "免费脆薯饼",
+      "couponImage": "https://mcd-portal-prod-cos1-1300270282.cos.ap-shanghai.myqcloud.com/campaign/prod/campaign-offer/coupon/0295cb54d2e24f4daba91b7b7a5a3dd5/%E5%85%8D%E8%B4%B9%E8%84%86%E8%96%AF%E9%A5%BC600.png?sign=q-sign-algorithm%3Dsha1%26q-ak%3DAKIDCD6mEcX25tVrjNxiPvEICas0uXyBKIBs%26q-sign-time%3D1774608147%3B1932288147%26q-key-time%3D1774608147%3B1932288147%26q-header-list%3D%26q-url-param-list%3D%26q-signature%3D9df7ad8f672007cbe5b0c268a401e446ada64902",
+      "couponStatus": "HAVING_RECEIVE",
+      "label": "已领取"
+    },
+    {
+      "couponName": "人气麦旋风买一送一",
+      "couponImage": "https://mcd-portal-prod-cos1-1300270282.cos.ap-shanghai.myqcloud.com/campaign/prod/campaign-offer/coupon/37d05e88d5da4834a6cebdb120d2826c/600x600.png?sign=q-sign-algorithm%3Dsha1%26q-ak%3DAKIDCD6mEcX25tVrjNxiPvEICas0uXyBKIBs%26q-sign-time%3D1791617408%3B1949297408%26q-key-time%3D1791617408%3B1949297408%26q-header-list%3D%26q-url-param-list%3D%26q-signature%3D04947e54fe34de442ffcaa9f5bc9de702ae0ee5e",
+      "couponStatus": "HAVING_RECEIVE",
+      "label": "已领取"
+    },
+    {
+      "couponName": "9.9元中杯冰美式",
+      "couponImage": "https://mcd-portal-prod-cos1-1300270282.cos.ap-shanghai.myqcloud.com/campaign/prod/campaign-offer/coupon/66a5597fe23246e698d9d63be003a951/9.9%E5%86%B0%E7%BE%8E%E5%BC%8F%E5%88%B8%E5%9B%BE600X600_compressed.png?sign=q-sign-algorithm%3Dsha1%26q-ak%3DAKIDCD6mEcX25tVrjNxiPvEICas0uXyBKIBs%26q-sign-time%3D1752487443%3B1910167443%26q-key-time%3D1752487443%3B1910167443%26q-header-list%3D%26q-url-param-list%3D%26q-signature%3Dbb50244da928a73c75aa906a93bdb2264ebace1d",
+      "couponStatus": "HAVING_RECEIVE",
+      "label": "已领取"
+    }
+  ]
 }

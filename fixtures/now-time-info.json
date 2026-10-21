@@ -2,19 +2,19 @@
   "success": true,
   "code": 200,
   "message": "请求成功",
-  "datetime": "2026-10-18 17:08:54",
+  "datetime": "2026-10-19 16:06:04",
   "traceId": "64eed312963a95ca1a3b74e0461b745f",
   "data": {
-    "timestamp": 1792314534576,
-    "datetime": "2026-10-18T17:08:54.576",
-    "formatted": "2026-10-18 17:08:54",
-    "date": "2026-10-18",
+    "timestamp": 1792397164950,
+    "datetime": "2026-10-19T16:06:04.950",
+    "formatted": "2026-10-19 16:06:04",
+    "date": "2026-10-19",
     "year": 2026,
     "month": 10,
-    "day": 18,
-    "dayOfWeek": "SUNDAY",
+    "day": 19,
+    "dayOfWeek": "MONDAY",
     "timezone": "GMT+08:00",
     "offset": "+08:00",
-    "utc": "2026-10-18T09:08:54.576Z"
+    "utc": "2026-10-19T08:06:04.950Z"
   }
 }

@@ -107,6 +107,17 @@ export function pickFavorite(favorites, key) {
 }
 
 /**
+ * 「这一轮的店是谁替用户定的」那句话术的唯一来源。
+ * `storeLine` 与「今天吃啥」的标题行都要用它 —— 两处各写一套，早晚会有一处把
+ * 「按收藏自动采用」说成「你绑定的」，那是凭空替用户认领一次决定。
+ */
+export function storeNote(store) {
+  if (!store) return '';
+  return store.source === 'arg' ? '本轮临时指定，不改绑定'
+    : store.origin !== 'user' ? '按收藏采用，还没跟你确认过' : '';
+}
+
+/**
  * 门店级结论的口径行。每轮都要有，不许沉默——
  * 结论对不对取决于店，用户不知道是哪家就没法判断。（2026-10-20 定的硬规则）
  *
@@ -116,7 +127,6 @@ export function pickFavorite(favorites, key) {
 export function storeLine(store) {
   if (!store) return '门店：未定 —— 以下结论不带任何门店口径，别当成本地某家店';
   const label = store.alias ? `${store.alias}（${store.name ?? store.code}）` : (store.name ?? store.code);
-  const note = store.source === 'arg' ? '本轮临时指定，不改绑定'
-    : store.origin !== 'user' ? '按收藏采用，还没跟你确认过' : '';
+  const note = storeNote(store);
   return `门店：${label}${note ? `，${note}` : ''}`;
 }

@@ -67,7 +67,20 @@ const commonOf = (code) => ({
   store: asStore(favorites.find((s) => s.storeCode === code)),
   sceneBeType: 1,
 });
-const modelWith = (code) => buildModel(commonOf(code));
+/**
+ * 缺这家店的菜单快照时返回 null，**不抛**。
+ * 早先这里直接 buildModel(commonOf(code))，而 commonOf 里的 loadScoped 会抛 —— 于是【绑定层】第 99 行
+ * 就把整个进程带堆栈打出去了，后面【来源层】那三条专为「缺快照要优雅报告」准备的断言一条都没跑到。
+ * 闸门要红得起来，不能崩在半路。
+ */
+const modelWith = (code) => {
+  try { return buildModel(commonOf(code)); } catch { return null; }
+};
+const gapMsg = (code) => `门店 ${code} 没有菜单快照，依赖它实盘的断言判不了`
+  + ` —— 先抓：node tools/probe-mcp.mjs query-meals --args '{"storeCode":"${code}","orderType":1,"beType":1}'`;
+// 每家收藏店现算一次；缺快照的存 null，由各段自己记红并继续（见 modelWith 的注释）
+const MODEL = new Map(favorites.map((s) => [s.storeCode, modelWith(s.storeCode)]));
+const modelOr = (code) => MODEL.get(code) ?? null;
 
 console.log(`数据来源：${DIR}/  收藏：${favorites.map((s) => `${s.storeCode} ${s.storeName}`).join(' / ')}\n`);
 
@@ -96,22 +109,27 @@ if (bindStore) {
     `bindStore 落盘 1 家且置默认：${JSON.stringify(bound.stores)}`);
   ok(bound.stores[0].alias === '家' && bound.stores[0].name === FB.storeName,
     '别名与店名一起落盘（对齐 SKILL.md:138 的 {alias, code, name, city}）');
-  const d = diff(bound, modelWith(FB.storeCode));
-  ok(d.needStore === false, `绑定后 needStore 变 false（当前 ${d.needStore}）`);
-  ok(!wakeLines(d, modelWith(FB.storeCode)).some((l) => l.includes('按你的收藏门店判定')),
-    '抬头三行里不再出现催绑句（这句现在每轮都印，且永远闭不了嘴）');
-  ok(diff(EMPTY, modelWith(FB.storeCode)).needStore === true, '没绑店时仍须判 needStore（防反向回归）');
-  const folded = snapshot(EMPTY, modelWith(FB.storeCode));
-  ok(folded.stores?.length === 1 && folded.stores[0].code === FB.storeCode,
-    `snapshot 把本次所判门店折进 state：${JSON.stringify(folded.stores ?? null)}`);
-  const twice = snapshot(bindStore(EMPTY, asStore(FA), { alias: '默认' }), modelWith(FB.storeCode));
-  ok(twice.stores.some((s) => s.code === FB.storeCode)
-    && twice.stores.find((s) => s.isDefault)?.code === FA.storeCode,
-    '折入新店不得抢走已有默认店（静默换店会让结论全错而用户不知情）');
-  // 采用≠绑定：没确认过的店，落盘之后也不能升格成「用户绑的」
-  const again = resolveStore({ state: snapshot(EMPTY, modelWith(FB.storeCode)), favorites });
-  ok(again.origin !== 'user' && again.source === 'state',
-    `自动采用的店落盘后 origin 仍是 ${again.origin}，不许伪装成用户确认过`);
+  const mB = modelOr(FB.storeCode);
+  if (!mB) {
+    ok(false, gapMsg(FB.storeCode));
+  } else {
+    const d = diff(bound, mB);
+    ok(d.needStore === false, `绑定后 needStore 变 false（当前 ${d.needStore}）`);
+    ok(!wakeLines(d, mB).some((l) => l.includes('按你的收藏门店判定')),
+      '抬头三行里不再出现催绑句（这句现在每轮都印，且永远闭不了嘴）');
+    ok(diff(EMPTY, mB).needStore === true, '没绑店时仍须判 needStore（防反向回归）');
+    const folded = snapshot(EMPTY, mB);
+    ok(folded.stores?.length === 1 && folded.stores[0].code === FB.storeCode,
+      `snapshot 把本次所判门店折进 state：${JSON.stringify(folded.stores ?? null)}`);
+    const twice = snapshot(bindStore(EMPTY, asStore(FA), { alias: '默认' }), mB);
+    ok(twice.stores.some((s) => s.code === FB.storeCode)
+      && twice.stores.find((s) => s.isDefault)?.code === FA.storeCode,
+      '折入新店不得抢走已有默认店（静默换店会让结论全错而用户不知情）');
+    // 采用≠绑定：没确认过的店，落盘之后也不能升格成「用户绑的」
+    const again = resolveStore({ state: snapshot(EMPTY, mB), favorites });
+    ok(again.origin !== 'user' && again.source === 'state',
+      `自动采用的店落盘后 origin 仍是 ${again.origin}，不许伪装成用户确认过`);
+  }
 } else {
   ok(false, 'bindStore 未实现');
 }
@@ -127,6 +145,16 @@ let guard = null;
 try { mealsOf(GHOST); } catch (e) { guard = e; }
 ok(!!guard && String(guard.message).includes(GHOST),
   `不存在的门店 ${GHOST} 必须报错且点名门店，不许回退到别家店的菜单${guard ? ` → "${guard.message}"` : ' → 静默返回了数据'}`);
+/**
+ * 缺陷① 的自检：闸门自己不许在半路崩。
+ * 2026-10-20 实测 —— `modelWith` 直接 buildModel(loadScoped(...))，缺快照时抛异常带堆栈退出，
+ * 于是上面这条专为「缺快照要停下」准备的断言之后、【点名层】【口径路由表】一条都没跑到，
+ * 而 preflight 那时只查文件存在，还照样打印「可以提交」。
+ */
+let modelGuard = 'no-throw';
+try { modelGuard = modelWith(GHOST) === null ? 'no-throw' : '返回了非 null'; } catch { modelGuard = 'throw'; }
+ok(modelGuard === 'no-throw',
+  `modelWith 缺快照时必须返回 null 让闸门继续（实得 ${modelGuard}）—— 闸门要红得起来，不能崩在半路`);
 
 // 结构性断言：门店无关的文件名再也不能被门店级消费点读走
 const legacy = ['wake.mjs', 'eat.mjs', 'demo.mjs', 'check.mjs', 'check-share.mjs']
@@ -138,31 +166,45 @@ ok(!legacy.length, `没有代码从无 key 的 query-meals.json 读菜单${legac
 
 console.log('\n【点名层】凡门店级结论，每一轮都要说清是哪家店');
 if (storeLine) {
+  const mB = modelOr(FB.storeCode);
   const none = storeLine(null);
   ok(typeof none === 'string' && none.includes('未定'),
     `没有门店时也要出一行口径说明，不能沉默：「${none}」`);
-  const adopted2 = resolveStore({ state: snapshot(EMPTY, modelWith(FB.storeCode)), favorites });
-  const l1 = storeLine(adopted2);
-  ok(l1.includes(FB.storeName) && /还没跟你确认|未确认/.test(l1),
-    `按收藏自动采用的店：点名 + 标注没确认过 →「${l1}」`);
   const l2 = storeLine(resolveStore({ state: bindStore(EMPTY, asStore(FB), { alias: '家' }), favorites }));
   ok(l2.includes('家') && !/还没跟你确认/.test(l2),
     `确认绑定过的店：点名即可，不再带注记 →「${l2}」`);
   const l3 = storeLine(resolveStore({ state: EMPTY, arg: FA.storeCode, favorites }));
   ok(l3.includes(FA.storeName) && /临时/.test(l3), `临时指定的店必须写明不改绑定 →「${l3}」`);
 
+  if (mB) {
+    const adopted2 = resolveStore({ state: snapshot(EMPTY, mB), favorites });
+    const l1 = storeLine(adopted2);
+    ok(l1.includes(FB.storeName) && /还没跟你确认|未确认/.test(l1),
+      `按收藏自动采用的店：点名 + 标注没确认过 →「${l1}」`);
+    // 脱面口径：发群卡刻意匿名，账单卡必须带真名
+    ok(renderText(mB).includes(FB.storeName), '账单文本版印真店名（使用面不脱）');
+    ok(!renderPropagate(buildModel({ ...commonOf(FB.storeCode), share: true })).includes(FB.storeName),
+      '发群版仍不得出现真店名——点名是对话里那句，不是卡片上');
+  } else {
+    ok(false, gapMsg(FB.storeCode));
+  }
+
   // 真跑一次「今天吃啥」——用户看到的那句里到底有没有门店，只有产物能证明
   let eatOut = '';
   try {
     eatOut = execFileSync(process.execPath, ['src/eat.mjs'], { cwd: ROOT, encoding: 'utf8', timeout: 60000 });
   } catch (e) { eatOut = String(e.stdout ?? '') + String(e.stderr ?? ''); }
-  ok(/门店：/.test(eatOut), `eat.mjs 产物里必须有门店行（门店级结论不许匿名）`);
-  if (!/门店：/.test(eatOut)) console.log('    实际输出：' + eatOut.split('\n').slice(0, 3).join(' / '));
-
-  // 脱面口径：发群卡刻意匿名，账单卡必须带真名
-  ok(renderText(modelWith(FB.storeCode)).includes(FB.storeName), '账单文本版印真店名（使用面不脱）');
-  ok(!renderPropagate(buildModel({ ...commonOf(FB.storeCode), share: true })).includes(FB.storeName),
-    '发群版仍不得出现真店名——点名是对话里那句，不是卡片上');
+  /*
+    三轨版（D12=④ / T10 / T14）：店名、本轮这家店是怎么定的、样例来源，全部并进标题行；
+    独立的 `门店：` 行取消 —— 5 行正文要给三条轨，多占一行就会把末行的时段与余量挤掉。
+    所以这里查的是「标题里有没有店名」与「有没有多占一行」，不再是「有没有 门店： 那三个字」。
+  */
+  ok(eatOut.includes(FA.storeName ?? FA.storeCode),
+    `eat.mjs 产物必须点名是哪家店（店名要出现在标题行里）${eatOut.split('\n')[0] ? ` →「${eatOut.split('\n')[0]}」` : ''}`);
+  ok(!/^\s*门店：/m.test(eatOut), '三轨版不得再出现独立的「门店：」行 —— 那一行要还给三条轨');
+  ok(/还没跟你确认|临时指定/.test(eatOut),
+    '本轮是自动采用还是临时指定，必须在同一行说清（不能让用户以为绑过了）');
+  if (!eatOut.includes(FA.storeName ?? '')) console.log('    实际输出：' + eatOut.split('\n').slice(0, 3).join(' / '));
 } else {
   ok(false, 'storeLine 未实现');
 }
@@ -200,14 +242,29 @@ console.log('\n【口径路由表】SKILL.md 每个意图都要标口径，门�
 }
 
 console.log('\n【现算一遍】两家店各自的结论。菜单 traceId 若两家相同，就是在拿同一家店的价目表算两家');
+const traces = [];
 for (const s of favorites) {
-  const m = modelWith(s.storeCode);
+  const m = modelOr(s.storeCode);
+  if (!m) {
+    ok(false, gapMsg(s.storeCode));
+    continue;
+  }
+  let trace = null;
+  try { trace = mealsOf(s.storeCode)?.traceId ?? null; } catch { /* 上面已记红 */ }
+  traces.push([s.storeCode, trace]);
   const top = m.coupons.filter((c) => c.state === 'now')
     .reduce((a, c) => (!a || (c.realGain ?? -1) > (a.realGain ?? -1) ? c : a), null);
   console.log(`   ${s.storeCode} ${s.storeName}`);
-  console.log(`     菜单 traceId=${String(mealsOf(s.storeCode)?.traceId).slice(0, 8)}`
+  console.log(`     菜单 traceId=${String(trace).slice(0, 8)}`
     + ` · 放行 ${m.coupons.filter((c) => c.state === 'now').length} 张`
     + `${top ? ` · top1 ${top.displayTitle} 到手¥${top.ladderProduct?.sale} 省¥${top.realGain?.toFixed(1)}` : ''}`);
+}
+// 只在两家都取到 traceId 时才判——缺一家时上面已经红过了，不该再叠一条假红
+if (traces.length === favorites.length && traces.every(([, t]) => t)) {
+  ok(new Set(traces.map(([, t]) => t)).size === traces.length,
+    `每家店的菜单 traceId 必须互不相同${traces.map(([c, t]) => ` ${c}=${String(t).slice(0, 8)}`).join('')}`);
+} else {
+  console.log('   · traceId 互异性本跳过（有门店缺快照，已在上面记红）');
 }
 
 console.log(fail ? `\n${fail} 项不通过` : '\n全部通过');
